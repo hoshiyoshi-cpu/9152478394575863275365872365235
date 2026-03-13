@@ -27,7 +27,7 @@ math.randomseed(os.time())
 local THEME = {
     Background = Color3.fromRGB(37, 74, 68),
     ItemBG = Color3.fromRGB(0, 45, 43),
-    Accent = Color3.fromRGB(255, 255, 255),
+    Accent = Color3.fromRGB(90, 230, 206),
     Text = Color3.fromRGB(240, 240, 240),
     SubText = Color3.fromRGB(150, 150, 160),
     Success = Color3.fromRGB(100, 255, 140),
