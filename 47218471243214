@@ -32,7 +32,7 @@ local THEME = {
     SubText = Color3.fromRGB(150, 150, 160),
     Success = Color3.fromRGB(100, 255, 140),
     Warning = Color3.fromRGB(255, 200, 80),
-    Slider = Color3.fromRGB(204, 204, 204)
+    Slider = Color3.fromRGB(15, 87, 82)
 }
 
 local function ColorToRGB(c)
