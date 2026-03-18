@@ -1601,6 +1601,7 @@ local function SearchWords()
     -- Parse multiple endings (split by comma or space)
     local endings = {}
     if eVal ~= "" then
+        -- Split by comma or space
         for match in eVal:gmatch("[^,%s]+") do
             local clean = match:lower():gsub("[%s%c]+", "")
             if #clean > 0 then
@@ -1609,11 +1610,10 @@ local function SearchWords()
         end
     end
     
-    -- Store the raw string for config
-    suffixMode = eVal
+    -- Store for main list (keep first one for backward compatibility)
+    suffixMode = eVal[1] or ""
     Config.SuffixMode = suffixMode
     
-    -- Store the parsed endings list for main menu
     suffixModeList = endings
     
     lengthMode = lVal or 0
@@ -1637,7 +1637,6 @@ local function SearchWords()
         end
     end
     
-    -- Collect results (simple list)
     for _, w in ipairs(bucket) do
         local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
         
@@ -1660,8 +1659,32 @@ local function SearchWords()
         end
     end
     
-    -- Sort results
-    table.sort(results)
+    -- Sort results for display
+    if #endings > 1 then
+        -- Optional: sort by which ending they match (for consistent display)
+        table.sort(results, function(a, b)
+            -- First try to sort by the endings they match
+            local aEnding = ""
+            local bEnding = ""
+            for _, ending in ipairs(endings) do
+                if a:sub(-#ending) == ending then
+                    aEnding = ending
+                    break
+                end
+            end
+            for _, ending in ipairs(endings) do
+                if b:sub(-#ending) == ending then
+                    bEnding = ending
+                    break
+                end
+            end
+            if aEnding ~= bEnding then
+                return aEnding < bEnding
+            end
+            -- Then sort alphabetically within same ending group
+            return a < b
+        end)
+    end
     
     for i, w in ipairs(results) do
         local row = Instance.new("TextButton", WBList)
@@ -1688,6 +1711,20 @@ local function SearchWords()
         lbl.Position = UDim2.new(0, 5, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+        
+        -- Optional: add a small colored indicator showing which ending was matched
+        if #endings > 1 then
+            for _, ending in ipairs(endings) do
+                if w:sub(-#ending) == ending then
+                    local indicator = Instance.new("Frame", row)
+                    indicator.Size = UDim2.new(0, 3, 1, -4)
+                    indicator.Position = UDim2.new(1, -8, 0, 2)
+                    indicator.BackgroundColor3 = Color3.fromHSV((#ending * 0.1) % 1, 0.8, 0.8)
+                    Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
+                    break
+                end
+            end
+        end
     end
     
     -- Update status with count
@@ -2275,69 +2312,47 @@ local function CollectMatches(prefix, tryFallbackLengths)
     local browserActive = (#endings > 0 or currentLengthMode > 0)
     
     if bucket then
-        -- First try: with browser filters (if browser is active)
-        if browserActive then
-            for _, w in ipairs(bucket) do
-                if Blacklist[w] or UsedWords[w] then goto continue end
-                
+        local checkWord = function(w, applyFilters)
+            if Blacklist[w] or UsedWords[w] then return end
+            
+            -- Apply browser filters if requested
+            if applyFilters and browserActive then
                 -- Check if word ends with ANY of the specified endings
-                local matchEnd = false
-                local matchedPriority = 999
                 if #endings > 0 then
-                    for idx, ending in ipairs(endings) do
+                    local matchEnd = false
+                    for _, ending in ipairs(endings) do
                         if w:sub(-#ending) == ending then
                             matchEnd = true
-                            matchedPriority = idx
                             break
                         end
                     end
-                    if not matchEnd then goto continue end
+                    if not matchEnd then return end
                 end
                 
                 if currentLengthMode > 0 and #w ~= currentLengthMode then 
-                    goto continue
+                    return 
                 end
-
-                -- Check if word starts with our current prefix
-                local mLen = GetMatchLength(w, prefix)
-                if mLen == #prefix then
-                    table.insert(exacts, {word = w, priority = matchedPriority})
-                elseif #exacts == 0 then
-                    if mLen > maxPartialLen then
-                        maxPartialLen = mLen
-                        partials = {w}
-                    elseif mLen == maxPartialLen and mLen > 0 then
-                        if #partials < 50 then table.insert(partials, w) end
-                    end
-                end
-                
-                ::continue::
             end
-            
-            -- Sort exacts by priority (lower number = higher priority)
-            if #exacts > 0 then
-                table.sort(exacts, function(a, b)
-                    if a.priority ~= b.priority then
-                        return a.priority < b.priority
-                    end
-                    -- If same priority, apply normal sort mode
-                    if sortMode == "Longest" then
-                        return #a.word > #b.word
-                    elseif sortMode == "Shortest" then
-                        return #a.word < #b.word
-                    elseif sortMode == "Killer" then
-                        return GetKillerScore(a.word) > GetKillerScore(b.word)
-                    else
-                        return a.word < b.word
-                    end
-                end)
-                
-                -- Convert back to simple word list
-                local sortedWords = {}
-                for _, item in ipairs(exacts) do
-                    table.insert(sortedWords, item.word)
+
+            -- Check if word starts with our current prefix
+            local mLen = GetMatchLength(w, prefix)
+            if mLen == #prefix then
+                table.insert(exacts, w)
+            elseif #exacts == 0 then  -- Only track partials if we have NO exact matches yet
+                if mLen > maxPartialLen then
+                    maxPartialLen = mLen
+                    partials = {w}
+                elseif mLen == maxPartialLen and mLen > 0 then
+                    if #partials < 50 then table.insert(partials, w) end
                 end
-                exacts = sortedWords
+            end
+        end
+
+        -- First try: with browser filters (if browser is active)
+        if browserActive then
+            for _, w in ipairs(bucket) do
+                checkWord(w, true)  -- Pass true to apply filters
+                if #exacts >= 200 then break end
             end
         end
         
@@ -2348,21 +2363,8 @@ local function CollectMatches(prefix, tryFallbackLengths)
             maxPartialLen = 0
             
             for _, w in ipairs(bucket) do
-                if Blacklist[w] or UsedWords[w] then goto continue2 end
-                
-                local mLen = GetMatchLength(w, prefix)
-                if mLen == #prefix then
-                    table.insert(exacts, w)
-                elseif #exacts == 0 then
-                    if mLen > maxPartialLen then
-                        maxPartialLen = mLen
-                        partials = {w}
-                    elseif mLen == maxPartialLen and mLen > 0 then
-                        if #partials < 50 then table.insert(partials, w) end
-                    end
-                end
-                
-                ::continue2::
+                checkWord(w, false)  -- Pass false to skip filters
+                if #exacts >= 200 then break end
             end
             
             -- Update status to show we're ignoring browser filters
@@ -2375,7 +2377,7 @@ local function CollectMatches(prefix, tryFallbackLengths)
             partials = {}
         end
         
-        if sortMode == "Random" and #exacts > 0 and not browserActive then
+        if sortMode == "Random" and #exacts > 0 then
             shuffleTable(exacts)
         end
     end
