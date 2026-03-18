@@ -2234,28 +2234,64 @@ UpdateList = function(detectedText, requiredLetter)
     end
     
     local function CollectMatches(prefix, tryFallbackLengths)
-        local exacts = {}
-        local partials = {}
-        local maxPartialLen = 0
-        local limit = 100
+    local exacts = {}
+    local partials = {}
+    local maxPartialLen = 0
+    
+    -- Store browser filter state for this check
+    local currentSuffixMode = suffixMode
+    local currentLengthMode = lengthMode
+    local browserActive = (currentSuffixMode ~= "" or currentLengthMode > 0)
+    
+    if bucket then
+        local checkWord = function(w)
+            if Blacklist[w] or UsedWords[w] then return end
+            
+            -- Check browser filters if browser is active
+            if browserActive then
+                if currentSuffixMode ~= "" and w:sub(-#currentSuffixMode) ~= currentSuffixMode then 
+                    return 
+                end
+                if currentLengthMode > 0 and #w ~= currentLengthMode then 
+                    return 
+                end
+            end
+
+            -- Check if word starts with our current prefix
+            local mLen = GetMatchLength(w, prefix)
+            if mLen == #prefix then
+                table.insert(exacts, w)
+            elseif #exacts == 0 then  -- Only track partials if we have NO exact matches yet
+                if mLen > maxPartialLen then
+                    maxPartialLen = mLen
+                    partials = {w}
+                elseif mLen == maxPartialLen and mLen > 0 then
+                    if #partials < 50 then table.insert(partials, w) end
+                end
+            end
+        end
+
+        -- First try: with browser filters (if browser is active)
+        if browserActive then
+            for _, w in ipairs(bucket) do
+                checkWord(w)
+                if #exacts >= 200 then break end
+            end
+        end
         
-        if bucket then
-            local checkWord = function(w)
+        -- If we got no matches with browser filters, try WITHOUT filters
+        if #exacts == 0 and browserActive then
+            exacts = {}
+            partials = {}
+            maxPartialLen = 0
+            
+            for _, w in ipairs(bucket) do
                 if Blacklist[w] or UsedWords[w] then return end
                 
-                -- Check for suffix filter (from browser) - ALWAYS apply this!
-                if suffixMode ~= "" and w:sub(-#suffixMode) ~= suffixMode then return end
-                
-                -- Check for length filter (from browser) - ALWAYS apply this!
-                if lengthMode > 0 then
-                    if #w ~= lengthMode then return end
-                end
-
-                -- Check if word starts with our current prefix (what's typed in game)
                 local mLen = GetMatchLength(w, prefix)
                 if mLen == #prefix then
                     table.insert(exacts, w)
-                elseif #exacts == 0 and #partials == 0 then  -- Only track partials if we have NO exact matches yet
+                elseif #exacts == 0 then
                     if mLen > maxPartialLen then
                         maxPartialLen = mLen
                         partials = {w}
@@ -2263,26 +2299,25 @@ UpdateList = function(detectedText, requiredLetter)
                         if #partials < 50 then table.insert(partials, w) end
                     end
                 end
-            end
-
-            -- Search through ALL words in bucket
-            for _, w in ipairs(bucket) do
-                checkWord(w)
                 if #exacts >= 200 then break end
             end
             
-            -- If we have no exact matches, clear partials if the max match length is less than prefix length
-            -- This means no words match both suffix AND have ANY matching prefix characters
-            if #exacts == 0 and maxPartialLen < #prefix then
-                partials = {}
-            end
-            
-            if sortMode == "Random" and #exacts > 0 then
-                shuffleTable(exacts)
-            end
+            -- Update status to show we're ignoring browser filters
+            StatusText.Text = "No matches with filter - showing all"
+            StatusText.TextColor3 = THEME.Warning
         end
-        return exacts, partials, maxPartialLen
+        
+        -- If we still have no exact matches, clear partials if max match length < prefix length
+        if #exacts == 0 and maxPartialLen < #prefix then
+            partials = {}
+        end
+        
+        if sortMode == "Random" and #exacts > 0 then
+            shuffleTable(exacts)
+        end
     end
+    return exacts, partials, maxPartialLen
+end
 
     local exacts, partials, pLen = CollectMatches(searchPrefix, false)
 
