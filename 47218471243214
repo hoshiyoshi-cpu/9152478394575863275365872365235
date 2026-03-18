@@ -2180,6 +2180,7 @@ UpdateList = function(detectedText, requiredLetter)
     local isBacktracked = false
     local manualSearch = false
     local isBrowserActive = false
+    local usingFallback = false
 
     -- Check if word browser is open and has filters
     local WordBrowserFrame = ScreenGui:FindFirstChild("WordBrowser")
@@ -2203,7 +2204,6 @@ UpdateList = function(detectedText, requiredLetter)
             -- Store browser filters
             suffixMode = eVal:lower():gsub("[%s%c]+", "")
             lengthMode = lVal
-            -- Don't override searchPrefix with startsWith here - let it use detectedText
         end
     end
 
@@ -2233,90 +2233,64 @@ UpdateList = function(detectedText, requiredLetter)
         bucket = Words
     end
     
-    local function CollectMatches(prefix, tryFallbackLengths)
-        local exacts = {}
-        local partials = {}
-        local fallbackWords = {}  -- Words that match suffix but not prefix
+    local function CollectMatches(prefix)
+        local exacts = {}      -- Words that match prefix AND suffix
+        local fallbacks = {}    -- Words that match suffix but NOT prefix
         local maxPartialLen = 0
-        local limit = 100
         
         if bucket then
-            local checkWord = function(w)
-                if Blacklist[w] or UsedWords[w] then return end
-                
-                -- Check for suffix filter (from browser) - ALWAYS apply this!
-                if suffixMode ~= "" and w:sub(-#suffixMode) ~= suffixMode then return end
-                
-                -- Check for length filter (from browser) - ALWAYS apply this!
-                if lengthMode > 0 then
-                    if #w ~= lengthMode then return end
-                end
-
-                -- Check if word starts with our current prefix (what's typed in game)
-                local mLen = GetMatchLength(w, prefix)
-                if mLen == #prefix then
-                    table.insert(exacts, w)
-                else
-                    -- Store in fallback for later use if no exact matches
-                    if #fallbackWords < 50 then
-                        table.insert(fallbackWords, w)
-                    end
-                end
-                
-                -- Track partial matches for backtracking when we have NO exact matches
-                if #exacts == 0 and #partials == 0 then
-                    if mLen > maxPartialLen then
-                        maxPartialLen = mLen
-                        partials = {w}
-                    elseif mLen == maxPartialLen and mLen > 0 then
-                        if #partials < 50 then table.insert(partials, w) end
-                    end
-                end
-            end
-
-            -- Search through ALL words in bucket
             for _, w in ipairs(bucket) do
-                checkWord(w)
-                if #exacts >= 200 then break end
-            end
-            
-            -- If we have no exact matches AND no partial matches that actually match our prefix partially,
-            -- show fallback words (words that match suffix but don't start with our prefix)
-            if #exacts == 0 and maxPartialLen < #prefix then
-                partials = {}  -- Clear partials
-                -- Use fallback words as suggestions
-                for _, w in ipairs(fallbackWords) do
-                    if #partials < 50 then
-                        table.insert(partials, w)
+                if not Blacklist[w] and not UsedWords[w] then
+                    
+                    -- Check for suffix filter (from browser)
+                    if suffixMode ~= "" and w:sub(-#suffixMode) ~= suffixMode then goto continue end
+                    
+                    -- Check for length filter (from browser)
+                    if lengthMode > 0 and #w ~= lengthMode then goto continue end
+
+                    -- Check if word starts with our current prefix
+                    local mLen = GetMatchLength(w, prefix)
+                    if mLen == #prefix then
+                        -- Exact prefix match
+                        table.insert(exacts, w)
+                    else
+                        -- Doesn't match prefix, store as fallback
+                        if #fallbacks < 100 then
+                            table.insert(fallbacks, w)
+                        end
+                        -- Track best partial match for potential backtracking
+                        if mLen > maxPartialLen then
+                            maxPartialLen = mLen
+                        end
                     end
                 end
-                -- Mark that we're showing fallback suggestions
-                isBacktracked = true
-                -- Use empty string for searchPrefix to show full words
-                searchPrefix = ""
+                ::continue::
             end
             
             if sortMode == "Random" and #exacts > 0 then
                 shuffleTable(exacts)
             end
         end
-        return exacts, partials, maxPartialLen
+        return exacts, fallbacks, maxPartialLen
     end
 
-    local exacts, partials, pLen = CollectMatches(searchPrefix, false)
+    local exacts, fallbacks, pLen = CollectMatches(searchPrefix)
 
+    -- Decision logic:
     if #exacts > 0 then
+        -- We have words that match both prefix and suffix
         matches = exacts
-    elseif pLen > 0 then
-        matches = partials
-        searchPrefix = searchPrefix:sub(1, pLen)
+        usingFallback = false
+    elseif #fallbacks > 0 then
+        -- No prefix matches, but we have words that match suffix only
+        matches = fallbacks
+        usingFallback = true
         isBacktracked = true
-    end
-
-    -- If we're showing fallback suggestions, update the status text
-    if isBrowserActive and #exacts == 0 and #partials > 0 and searchPrefix == "" then
-        StatusText.Text = "No matches for '" .. detectedText .. "', showing all words ending with '" .. suffixMode .. "'"
-        StatusText.TextColor3 = THEME.Warning
+        searchPrefix = ""  -- Show full words since they don't match prefix
+    else
+        -- No matches at all
+        matches = {}
+        usingFallback = false
     end
     
     if #matches > 0 then
@@ -2339,6 +2313,20 @@ UpdateList = function(detectedText, requiredLetter)
     local displayList = {}
     local maxDisplay = 40
     for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
+    
+    -- Update status text based on what we're showing
+    if isBrowserActive then
+        if usingFallback and #matches > 0 then
+            StatusText.Text = "No matches for '" .. detectedText .. "', showing all words ending with '" .. suffixMode .. "'"
+            StatusText.TextColor3 = THEME.Warning
+        elseif #matches == 0 then
+            StatusText.Text = "No words found ending with '" .. suffixMode .. "'"
+            StatusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+        else
+            StatusText.Text = "Found " .. #matches .. " words ending with '" .. suffixMode .. "'"
+            StatusText.TextColor3 = THEME.Success
+        end
+    end
     
     if showKeyboard and KeyboardFrame.Visible then
         local colors = {
@@ -2371,21 +2359,10 @@ UpdateList = function(detectedText, requiredLetter)
         end
     end
 
-    if #matches > 0 and not isBacktracked then
+    if #matches > 0 and not usingFallback then
         currentBestMatch = matches[1]
     else
         currentBestMatch = nil
-    end
-    
-    if isBacktracked then
-        local validPart = searchPrefix
-        local invalidPart = detectedText:sub(#searchPrefix + 1)
-        local accentRGB = ColorToRGB(THEME.Accent)
-        StatusText.Text = "No match: <font color=\"rgb(" .. accentRGB .. ")\">" .. validPart .. "</font><font color=\"rgb(255,80,80)\">" .. invalidPart .. "</font>"
-        StatusText.TextColor3 = THEME.SubText
-    elseif #exacts == 0 and lengthMode > 0 and suffixMode ~= "" then
-         StatusText.Text = "No len match (showing all)"
-         StatusText.TextColor3 = THEME.Warning
     end
 
     for i = 1, math.max(#displayList, #ButtonCache) do
@@ -2447,7 +2424,10 @@ UpdateList = function(detectedText, requiredLetter)
             local textRGB = ColorToRGB(THEME.Text)
             
             local displayText = ""
-            if isBacktracked then
+            if usingFallback then
+                -- Show full word when using fallback
+                displayText = "<font color=\"rgb(" .. textRGB .. ")\">" .. w .. "</font>"
+            elseif isBacktracked then
                 local prefix = w:sub(1, #searchPrefix)
                 local suffix = w:sub(#searchPrefix + 1)
                 displayText = "<font color=\"rgb(" .. accentRGB .. ")\">" .. prefix .. "</font>"
