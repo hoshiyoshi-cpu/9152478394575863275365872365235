@@ -2178,16 +2178,32 @@ local function BinarySearchStart(list, prefix)
 end
 
 UpdateList = function(detectedText, requiredLetter)
-    local matches = {}
+local matches = {}
     local searchPrefix = detectedText
     local isBacktracked = false
     local manualSearch = false
+    local multiplePrefixes = {}
 
     if SearchBox and SearchBox.Text ~= "" then
-        searchPrefix = SearchBox.Text:lower():gsub("[%s%c]+", "")
-        manualSearch = true
-        if requiredLetter and searchPrefix:sub(1,1) ~= requiredLetter:sub(1,1):lower() then
-             requiredLetter = nil
+        local rawInput = SearchBox.Text:lower()
+        -- >>> FIX: Split by comma for multiple prefixes <
+        for part in rawInput:gmatch("[^,]+") do
+            local clean = part:gsub("[%s%c]+", "")
+            if #clean > 0 then
+                table.insert(multiplePrefixes, clean)
+            end
+        end
+
+        if #multiplePrefixes > 1 then
+            manualSearch = true
+            searchPrefix = multiplePrefixes[1]
+            requiredLetter = nil
+        elseif #multiplePrefixes == 1 then
+            searchPrefix = multiplePrefixes[1]
+            manualSearch = true
+            if requiredLetter and searchPrefix:sub(1,1) ~= requiredLetter:sub(1,1):lower() then
+                requiredLetter = nil
+            end
         end
     end
 
@@ -2284,6 +2300,39 @@ UpdateList = function(detectedText, requiredLetter)
     end
 
     local exacts, partials, pLen = CollectMatches(searchPrefix, false)
+
+    -- >>> FIX: Merge results from multiple prefixes <
+    if #multiplePrefixes > 1 then
+        local seen = {}
+        for _, w in ipairs(exacts) do seen[w] = true end
+
+        for i = 2, #multiplePrefixes do
+            local extraPrefix = multiplePrefixes[i]
+            local extraBucket
+            local firstChar = extraPrefix:sub(1,1)
+            if firstChar and firstChar ~= "" and Buckets then
+                extraBucket = Buckets[firstChar] or {}
+            else
+                extraBucket = Words
+            end
+
+            local startIndex = BinarySearchStart(extraBucket, extraPrefix)
+            if startIndex ~= -1 then
+                for j = startIndex, #extraBucket do
+                    local w = extraBucket[j]
+                    if w:sub(1, #extraPrefix) ~= extraPrefix then break end
+                    if not Blacklist[w] and not UsedWords[w] and not seen[w] then
+                        if suffixMode == "" or w:sub(-#suffixMode) == suffixMode then
+                            if lengthMode == 0 or #w == lengthMode then
+                                seen[w] = true
+                                table.insert(exacts, w)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 
     if #exacts > 0 and (suffixMode ~= "" or lengthMode > 0) then
     table.sort(exacts, function(a, b)
