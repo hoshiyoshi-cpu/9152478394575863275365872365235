@@ -2348,7 +2348,77 @@ end
     
     local displayList = {}
     local maxDisplay = 40
-    for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
+    
+    -- Add all primary matches first
+    for i = 1, math.min(maxDisplay, #matches) do 
+        table.insert(displayList, matches[i]) 
+    end
+    
+    -- If we have fewer than 40 matches, find additional words
+    if #displayList < maxDisplay and not isBrowserActive and not manualSearch and #detectedText > 0 then
+        local needed = maxDisplay - #displayList
+        local additionalWords = {}
+        
+        -- Get the starting letter from detectedText
+        local startLetter = detectedText:sub(1,1)
+        if startLetter and startLetter ~= "" and Buckets[startLetter] then
+            -- Shuffle a copy of the bucket to get random words
+            local bucketCopy = {}
+            for _, w in ipairs(Buckets[startLetter]) do
+                table.insert(bucketCopy, w)
+            end
+            shuffleTable(bucketCopy)
+            
+            -- Find words that aren't already in displayList and aren't blacklisted/used
+            for _, w in ipairs(bucketCopy) do
+                if #additionalWords >= needed then break end
+                
+                -- Check if word is already in displayList
+                local alreadyInList = false
+                for _, existing in ipairs(displayList) do
+                    if existing == w then
+                        alreadyInList = true
+                        break
+                    end
+                end
+                
+                -- Check if word starts with the same prefix and isn't blacklisted/used
+                if not alreadyInList and not Blacklist[w] and not UsedWords[w] and w:sub(1, #detectedText) == detectedText then
+                    table.insert(additionalWords, w)
+                end
+            end
+            
+            -- If we still need more words, add any valid words from the bucket
+            if #additionalWords < needed then
+                for _, w in ipairs(bucketCopy) do
+                    if #additionalWords >= needed then break end
+                    
+                    local alreadyInList = false
+                    for _, existing in ipairs(displayList) do
+                        if existing == w then
+                            alreadyInList = true
+                            break
+                        end
+                    end
+                    
+                    if not alreadyInList and not Blacklist[w] and not UsedWords[w] then
+                        table.insert(additionalWords, w)
+                    end
+                end
+            end
+            
+            -- Add the additional words to displayList
+            for _, w in ipairs(additionalWords) do
+                table.insert(displayList, w)
+            end
+            
+            -- Update status to show we added extra words
+            if #additionalWords > 0 then
+                StatusText.Text = "Added " .. #additionalWords .. " extra words"
+                StatusText.TextColor3 = THEME.Success
+            end
+        end
+    end
     
     if showKeyboard and KeyboardFrame.Visible then
         local colors = {
