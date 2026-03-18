@@ -2303,10 +2303,14 @@ local function CollectMatches(prefix, tryFallbackLengths)
     local partials = {}
     local maxPartialLen = 0
     
+    -- Store browser filter state for this check
+    local currentSuffixMode = suffixMode
+    local currentLengthMode = lengthMode
+    
     -- Parse multiple endings from suffixMode
     local endings = {}
-    if suffixMode ~= "" then
-        for match in suffixMode:gmatch("[^,%s]+") do
+    if currentSuffixMode ~= "" then
+        for match in currentSuffixMode:gmatch("[^,%s]+") do
             local clean = match:lower():gsub("[%s%c]+", "")
             if #clean > 0 then
                 table.insert(endings, clean)
@@ -2314,15 +2318,14 @@ local function CollectMatches(prefix, tryFallbackLengths)
         end
     end
     
-    local currentLengthMode = lengthMode
     local browserActive = (#endings > 0 or currentLengthMode > 0)
     
     if bucket then
-        local checkWord = function(w)
+        local checkWord = function(w, applyFilters)
             if Blacklist[w] or UsedWords[w] then return end
             
-            -- Check browser filters if browser is active
-            if browserActive then
+            -- Apply browser filters if requested
+            if applyFilters and browserActive then
                 -- Check if word ends with ANY of the specified endings
                 if #endings > 0 then
                     local matchEnd = false
@@ -2357,7 +2360,7 @@ local function CollectMatches(prefix, tryFallbackLengths)
         -- First try: with browser filters (if browser is active)
         if browserActive then
             for _, w in ipairs(bucket) do
-                checkWord(w)
+                checkWord(w, true)  -- Pass true to apply filters
                 if #exacts >= 200 then break end
             end
         end
@@ -2369,19 +2372,7 @@ local function CollectMatches(prefix, tryFallbackLengths)
             maxPartialLen = 0
             
             for _, w in ipairs(bucket) do
-                if Blacklist[w] or UsedWords[w] then return end
-                
-                local mLen = GetMatchLength(w, prefix)
-                if mLen == #prefix then
-                    table.insert(exacts, w)
-                elseif #exacts == 0 then
-                    if mLen > maxPartialLen then
-                        maxPartialLen = mLen
-                        partials = {w}
-                    elseif mLen == maxPartialLen and mLen > 0 then
-                        if #partials < 50 then table.insert(partials, w) end
-                    end
-                end
+                checkWord(w, false)  -- Pass false to skip filters
                 if #exacts >= 200 then break end
             end
             
