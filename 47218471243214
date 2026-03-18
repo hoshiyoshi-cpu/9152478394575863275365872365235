@@ -2349,17 +2349,17 @@ end
     local displayList = {}
     local maxDisplay = 40
     
-    -- Add all primary matches first
+    -- Add all primary matches first (words that START with detectedText)
     for i = 1, math.min(maxDisplay, #matches) do 
         table.insert(displayList, matches[i]) 
     end
     
-    -- If we have fewer than 40 matches, find additional words
-    if #displayList < maxDisplay and not isBrowserActive and not manualSearch and #detectedText > 0 then
+    -- If we have fewer than 40 matches and we're not in browser mode, find words that END with detectedText
+    if #displayList < maxDisplay and not isBrowserActive and not manualSearch and #detectedText > 2 then
         local needed = maxDisplay - #displayList
-        local additionalWords = {}
+        local endingWords = {}
         
-        -- Get the starting letter from detectedText
+        -- Get the first letter of detectedText to search in appropriate bucket
         local startLetter = detectedText:sub(1,1)
         if startLetter and startLetter ~= "" and Buckets[startLetter] then
             -- Shuffle a copy of the bucket to get random words
@@ -2369,9 +2369,9 @@ end
             end
             shuffleTable(bucketCopy)
             
-            -- Find words that aren't already in displayList and aren't blacklisted/used
+            -- First priority: Words that END with detectedText
             for _, w in ipairs(bucketCopy) do
-                if #additionalWords >= needed then break end
+                if #endingWords >= needed then break end
                 
                 -- Check if word is already in displayList
                 local alreadyInList = false
@@ -2382,16 +2382,18 @@ end
                     end
                 end
                 
-                -- Check if word starts with the same prefix and isn't blacklisted/used
-                if not alreadyInList and not Blacklist[w] and not UsedWords[w] and w:sub(1, #detectedText) == detectedText then
-                    table.insert(additionalWords, w)
+                -- Check if word ENDS with detectedText and isn't blacklisted/used
+                if not alreadyInList and not Blacklist[w] and not UsedWords[w] then
+                    if w:sub(-#detectedText) == detectedText then
+                        table.insert(endingWords, w)
+                    end
                 end
             end
             
-            -- If we still need more words, add any valid words from the bucket
-            if #additionalWords < needed then
+            -- Second priority: Any valid words from the same bucket
+            if #endingWords < needed then
                 for _, w in ipairs(bucketCopy) do
-                    if #additionalWords >= needed then break end
+                    if #endingWords >= needed then break end
                     
                     local alreadyInList = false
                     for _, existing in ipairs(displayList) do
@@ -2402,19 +2404,19 @@ end
                     end
                     
                     if not alreadyInList and not Blacklist[w] and not UsedWords[w] then
-                        table.insert(additionalWords, w)
+                        table.insert(endingWords, w)
                     end
                 end
             end
             
-            -- Add the additional words to displayList
-            for _, w in ipairs(additionalWords) do
+            -- Add the ending words to displayList
+            for _, w in ipairs(endingWords) do
                 table.insert(displayList, w)
             end
             
-            -- Update status to show we added extra words
-            if #additionalWords > 0 then
-                StatusText.Text = "Added " .. #additionalWords .. " extra words"
+            -- Update status to show we found ending words
+            if #endingWords > 0 then
+                StatusText.Text = "Found " .. #endingWords .. " words ending with '" .. detectedText .. "'"
                 StatusText.TextColor3 = THEME.Success
             end
         end
@@ -2431,11 +2433,26 @@ end
 
         for i = 1, math.min(3, #displayList) do
             local w = displayList[i]
-            local nextChar = w:sub(#searchPrefix + 1, #searchPrefix + 1)
-            if nextChar and nextChar ~= "" then
-                local char = nextChar:lower()
-                if not targetKeys[char] then
-                    targetKeys[char] = i
+            -- For ending words, we need to show the next letter AFTER the detected part
+            -- For words that start with detectedText, we use searchPrefix
+            -- For words that end with detectedText, we need to show letters before it
+            if w:sub(1, #detectedText) == detectedText then
+                -- Word starts with detectedText
+                local nextChar = w:sub(#detectedText + 1, #detectedText + 1)
+                if nextChar and nextChar ~= "" then
+                    local char = nextChar:lower()
+                    if not targetKeys[char] then
+                        targetKeys[char] = i
+                    end
+                end
+            else
+                -- Word ends with detectedText, show the letter before it
+                local beforeChar = w:sub(#w - #detectedText, #w - #detectedText)
+                if beforeChar and beforeChar ~= "" then
+                    local char = beforeChar:lower()
+                    if not targetKeys[char] then
+                        targetKeys[char] = i
+                    end
                 end
             end
         end
@@ -2527,16 +2544,23 @@ end
             local textRGB = ColorToRGB(THEME.Text)
             
             local displayText = ""
-            if isBacktracked then
-                local prefix = w:sub(1, #searchPrefix)
-                local suffix = w:sub(#searchPrefix + 1)
-                displayText = "<font color=\"rgb(" .. accentRGB .. ")\">" .. prefix .. "</font>"
-                    .. "<font color=\"rgb(" .. textRGB .. ")\">" .. suffix .. "</font>"
-            else
+            
+            -- Check if this word starts with detectedText or ends with detectedText
+            if w:sub(1, #detectedText) == detectedText then
+                -- Word starts with detectedText
                 local prefix = w:sub(1, #detectedText)
                 local suffix = w:sub(#detectedText + 1)
                 displayText = "<font color=\"rgb(" .. accentRGB .. ")\">" .. prefix .. "</font>"
                     .. "<font color=\"rgb(" .. textRGB .. ")\">" .. suffix .. "</font>"
+            elseif w:sub(-#detectedText) == detectedText then
+                -- Word ends with detectedText
+                local prefix = w:sub(1, #w - #detectedText)
+                local suffix = w:sub(#w - #detectedText + 1)
+                displayText = "<font color=\"rgb(" .. textRGB .. ")\">" .. prefix .. "</font>"
+                    .. "<font color=\"rgb(" .. accentRGB .. ")\">" .. suffix .. "</font>"
+            else
+                -- Fallback (shouldn't happen)
+                displayText = w
             end
             
             if lbl then lbl.Text = displayText end
