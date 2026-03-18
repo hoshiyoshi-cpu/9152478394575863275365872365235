@@ -1633,9 +1633,25 @@ do
         
         for _, w in ipairs(bucket) do
             local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
-            -- We can use the global vars now or local, doesn't matter much for this loop
-            local matchEnd = (eVal == "") or (w:sub(-#eVal) == eVal)
-            local matchLen = (not lVal) or (#w == lVal)
+        local matchLen = (not lVal) or (#w == lVal)
+        
+        -- >>> FIX: Check multiple suffixes in word browser <
+        local matchEnd = false
+        if eVal == "" then
+            matchEnd = true
+        else
+            local suffixList = Config.SuffixModes
+            if suffixList and #suffixList > 1 then
+                for _, s in ipairs(suffixList) do
+                    if w:sub(-#s) == s then
+                        matchEnd = true
+                        break
+                    end
+                end
+            else
+                matchEnd = w:sub(-#eVal) == eVal
+            end
+        end
             
             if matchStart and matchEnd and matchLen then
                 table.insert(results, w)
