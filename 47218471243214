@@ -1665,7 +1665,7 @@ do
         end
         
         WBList.CanvasSize = UDim2.new(0,0,0, WBLayout.AbsoluteContentSize.Y)
-        
+
         lastDetected = "---"
         forceUpdateList = true
     end
@@ -2264,7 +2264,8 @@ UpdateList = function(detectedText, requiredLetter)
                         checkWord(w)
                         
                         count = count + 1
-                        if count >= 3000 then break end
+                        local hardLimit = (suffixMode ~= "" or lengthMode > 0) and math.huge or 3000
+                        if count >= hardLimit then break end
                     end
                 end
             else
