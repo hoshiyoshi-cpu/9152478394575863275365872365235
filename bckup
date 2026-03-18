@@ -2208,23 +2208,6 @@ UpdateList = function(detectedText, requiredLetter)
     else
         bucket = Words
     end
-
-    local cacheKey = searchPrefix .. "|" .. tostring(requiredLetter) .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
-    local cached = MatchCache and MatchCache[cacheKey]
-    if cached and tick() - cached.time < 0.1 then
-        exacts = cached.exacts
-        partials = cached.partials
-        pLen = cached.pLen
-    else
-        exacts, partials, pLen = CollectMatches(searchPrefix, false)
-        if not MatchCache then MatchCache = {} end
-        MatchCache[cacheKey] = {
-            exacts = exacts,
-            partials = partials,
-            pLen = pLen,
-            time = tick()
-        }
-    end
     
     local function CollectMatches(prefix, tryFallbackLengths)
         local exacts = {}
@@ -2298,32 +2281,12 @@ UpdateList = function(detectedText, requiredLetter)
 
     local exacts, partials, pLen = CollectMatches(searchPrefix, false)
 
--- Only do fallback scan if first scan was fast (short prefix)
-if #exacts == 0 and lengthMode > 0 then
-    if #searchPrefix <= 3 then
-        -- Short prefix? Do fallback scan
-        local fallbackExacts = CollectMatches(searchPrefix, true)
+    if #exacts == 0 and lengthMode > 0 then
+        local fallbackExacts, fallbackPartials, fallbackPLen = CollectMatches(searchPrefix, true)
         if #fallbackExacts > 0 then
-            exacts = fallbackExacts
-        end
-    else
-        -- Long prefix? Just use partials
-        if pLen > 0 then
-            matches = partials
-            searchPrefix = searchPrefix:sub(1, pLen)
-            isBacktracked = true
-            goto skip_normal_matches
+             exacts = fallbackExacts
         end
     end
-end
-
-if #exacts > 0 then
-    matches = exacts
-elseif pLen > 0 then
-    matches = partials
-    searchPrefix = searchPrefix:sub(1, pLen)
-    isBacktracked = true
-end
 
     if #exacts > 0 then
         matches = exacts
