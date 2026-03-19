@@ -132,7 +132,7 @@ local thinkDelayMax = 1.2
 local listUpdatePending = false
 local forceUpdateList = false
 local lastInputTime = 0
-local LIST_DEBOUNCE = 0.2
+local LIST_DEBOUNCE = 0.05
 local currentBestMatch = nil
 
 if logConn then logConn:Disconnect() end
