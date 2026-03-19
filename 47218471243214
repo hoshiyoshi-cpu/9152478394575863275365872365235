@@ -2229,6 +2229,32 @@ UpdateList = function(detectedText, requiredLetter)
         end
     end
     
+    -- Pre-compute suffix matching once
+    local hasSuffixFilter = suffixMode ~= ""
+    local activeSuffixes = nil
+    local suffixLengths = nil
+    if hasSuffixFilter then
+        activeSuffixes = (Config.SuffixModes and #Config.SuffixModes > 0) and Config.SuffixModes or {suffixMode}
+        suffixLengths = {}
+        for i, s in ipairs(activeSuffixes) do
+            suffixLengths[i] = #s
+        end
+    end
+
+    local function matchesSuffix(w)
+        if not hasSuffixFilter then return true end
+        local wLen = #w
+        for i = 1, #activeSuffixes do
+            local sLen = suffixLengths[i]
+            if wLen >= sLen and w:sub(-sLen) == activeSuffixes[i] then return true end
+        end
+        return false
+    end
+
+    local function matchesFilters(w)
+        return matchesSuffix(w) and (lengthMode == 0 or #w == lengthMode)
+    end
+
     local firstChar = searchPrefix:sub(1,1)
     if firstChar == "#" then firstChar = nil end
 
@@ -2253,33 +2279,8 @@ UpdateList = function(detectedText, requiredLetter)
         if bucket then
             local checkWord = function(w)
                 if Blacklist[w] or UsedWords[w] then return end
-                
-                -- Check for main list filtering (suffix/length)
-                -- >>> FIX: Check against all suffixes if multiple are set <
-                if suffixMode ~= "" then
-                    local suffixList = Config.SuffixModes
-                    if suffixList and #suffixList > 1 then
-                        local anyMatch = false
-                        for _, s in ipairs(suffixList) do
-                            if w:sub(-#s) == s then
-                                anyMatch = true
-                                break
-                            end
-                        end
-                        if not anyMatch then return end
-                    else
-                        if w:sub(-#suffixMode) ~= suffixMode then return end
-                    end
-                end
-                
-                local isLengthMatch = true
-                if not tryFallbackLengths and lengthMode > 0 then
-                    isLengthMatch = (#w == lengthMode)
-                elseif tryFallbackLengths and lengthMode > 0 then
-                     isLengthMatch = true
-                end
-                
-                if not isLengthMatch then return end
+                if not matchesSuffix(w) then return end
+                if not tryFallbackLengths and lengthMode > 0 and #w ~= lengthMode then return end
 
                 local mLen = GetMatchLength(w, prefix)
                 if mLen == #prefix then
@@ -2405,39 +2406,11 @@ end
     
     if #matches > 0 then
         -- >>> FIX: Sort filtered and padding separately to keep filtered on top <
-        local filteredCount = 0
-        for _, w in ipairs(matches) do
-            local function checkSuffix(w)
-                if suffixMode == "" then return true end
-                local suffixList = Config.SuffixModes
-                if suffixList and #suffixList > 1 then
-                    for _, s in ipairs(suffixList) do
-                        if w:sub(-#s) == s then return true end
-                    end
-                    return false
-                end
-                return w:sub(-#suffixMode) == suffixMode
-            end
-            local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
-            if isFiltered then filteredCount = filteredCount + 1 end
-        end
-
+    
         local filtered = {}
         local padding = {}
         for _, w in ipairs(matches) do
-            local function checkSuffix(w)
-                if suffixMode == "" then return true end
-                local suffixList = Config.SuffixModes
-                if suffixList and #suffixList > 1 then
-                    for _, s in ipairs(suffixList) do
-                        if w:sub(-#s) == s then return true end
-                    end
-                    return false
-                end
-                return w:sub(-#suffixMode) == suffixMode
-            end
-            local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
-            if isFiltered then
+            if matchesFilters(w) then
                 table.insert(filtered, w)
             else
                 table.insert(padding, w)
