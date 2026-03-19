@@ -120,8 +120,8 @@ local lastAutoJoinCheck = 0
 local lastWordCheck = 0
 local cachedDetected = ""
 local cachedCensored = false
-local LOGIC_RATE = 0.1
-local AUTO_JOIN_RATE = 0.5
+local LOGIC_RATE = 0.2
+local AUTO_JOIN_RATE = 1.0
 local UpdateList
 local ButtonCache = {}
 local ButtonData = {}
@@ -132,7 +132,7 @@ local thinkDelayMax = 1.2
 local listUpdatePending = false
 local forceUpdateList = false
 local lastInputTime = 0
-local LIST_DEBOUNCE = 0.05
+local LIST_DEBOUNCE = 0.2
 local currentBestMatch = nil
 
 if logConn then logConn:Disconnect() end
@@ -2468,7 +2468,7 @@ end
     end
     
     local displayList = {}
-    local maxDisplay = 40
+    local maxDisplay = 20
     for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
     
     if showKeyboard and KeyboardFrame.Visible then
@@ -2670,7 +2670,7 @@ do
     StatsData.Count = sc
 end
 
-runConn = RunService.RenderStepped:Connect(function()
+runConn = RunService.Heartbeat:Connect(function()
     local success, err = pcall(function()
         local now = tick()
         local player = Players.LocalPlayer
