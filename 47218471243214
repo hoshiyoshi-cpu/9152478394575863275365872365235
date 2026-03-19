@@ -2872,13 +2872,17 @@ runConn = RunService.Heartbeat:Connect(function()
         
         if listUpdatePending and (now - lastInputTime > LIST_DEBOUNCE) then
             listUpdatePending = false
-            UpdateList(lastDetected, lastRequiredLetter)
-            
-            local visCount = 0
-            for _, b in ipairs(ButtonCache) do
-                if b.Visible then visCount = visCount + 1 end
-            end
-            StatsData.Count.Text = "Words: " .. visCount .. "+"
+            local snapDetected = lastDetected
+            local snapRequired = lastRequiredLetter
+            task.spawn(function()
+                UpdateList(snapDetected, snapRequired)
+                
+                local visCount = 0
+                for _, b in ipairs(ButtonCache) do
+                    if b.Visible then visCount = visCount + 1 end
+                end
+                StatsData.Count.Text = "Words: " .. visCount .. "+"
+            end)
         end
 
         if not isVisible then
