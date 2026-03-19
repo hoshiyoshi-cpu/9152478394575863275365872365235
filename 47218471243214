@@ -133,7 +133,7 @@ local thinkDelayMax = 1.2
 local listUpdatePending = false
 local forceUpdateList = false
 local lastInputTime = 0
-local LIST_DEBOUNCE = 0.05
+local LIST_DEBOUNCE = 0.12
 local currentBestMatch = nil
 
 if logConn then logConn:Disconnect() end
@@ -2209,6 +2209,7 @@ end
 
 UpdateList = function(detectedText, requiredLetter)
     local matches = {}
+    local displayCache = {}
     local searchPrefix = detectedText
     local isBacktracked = false
     local manualSearch = false
@@ -2348,7 +2349,7 @@ end
     end
 
     -- >>> FIX: Pad list with shortest prefix matches if under 40 results <
-    if (suffixMode ~= "" or lengthMode > 0) and #exacts < 40 then
+    if (suffixMode ~= "" or lengthMode > 0) and #exacts < 40 and #exacts > 0 then
         local alreadyIn = {}
         for _, w in ipairs(exacts) do alreadyIn[w] = true end
 
@@ -2442,24 +2443,20 @@ end
             end
         end
 
-        local function sortGroup(t, forceShort)
-            if forceShort or (suffixMode ~= "" and sortMode == "Random") then
-                table.sort(t, function(a, b) return #a < #b end)
-            elseif sortMode == "Longest" then
+        local function sortGroup(t)
+            if sortMode == "Longest" then
                 table.sort(t, function(a, b) return #a > #b end)
-            elseif sortMode == "Shortest" or sortMode == "Random" then
-                table.sort(t, function(a, b) return #a < #b end)
             elseif sortMode == "Killer" then
                 table.sort(t, function(a, b)
-                    local sA = GetKillerScore(a)
-                    local sB = GetKillerScore(b)
-                    if sA == sB then return #a < #b end
-                    return sA > sB
+                    local sA, sB = GetKillerScore(a), GetKillerScore(b)
+                    return sA == sB and #a < #b or sA > sB
                 end)
+            else
+                table.sort(t, function(a, b) return #a < #b end)
             end
         end
 
-        sortGroup(filtered, true)
+        sortGroup(filtered)
         sortGroup(padding)
 
         matches = {}
@@ -2520,10 +2517,8 @@ end
     end
 
     -- >>> FIX: Destroy excess buttons instead of hiding them <
-    while #ButtonCache > #displayList do
-        local btn = table.remove(ButtonCache)
-        ButtonData[btn] = nil
-        btn:Destroy()
+    for i = #displayList + 1, #ButtonCache do
+        ButtonCache[i].Visible = false
     end
 
     for i = 1, #displayList do
@@ -2592,7 +2587,14 @@ end
                 .. "<font color=\"rgb(" .. textRGB .. ")\">" .. suffix .. "</font>"
         end
 
-        if lbl then lbl.Text = displayText end
+        local cacheKey = w .. "|" .. #detectedText .. "|" .. tostring(isBacktracked) .. "|" .. accentRGB
+        if not displayCache[cacheKey] then
+            local prefix = w:sub(1, isBacktracked and #searchPrefix or #detectedText)
+            local suffix = w:sub(#prefix + 1)
+            displayCache[cacheKey] = "<font color=\"rgb(" .. accentRGB .. ")\">" .. prefix .. "</font>"
+                .. "<font color=\"rgb(" .. textRGB .. ")\">" .. suffix .. "</font>"
+        end
+        if lbl then lbl.Text = displayCache[cacheKey] end
     end
     
     ScrollList.CanvasSize = UDim2.new(0,0,0, UIListLayout.AbsoluteContentSize.Y)
