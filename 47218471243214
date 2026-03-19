@@ -2713,7 +2713,7 @@ runConn = RunService.Heartbeat:Connect(function()
 
         local isMyTurn, requiredLetter = GetTurnInfo(frame)
         
-        if (now - lastWordCheck) > 0.05 then
+        if (now - lastWordCheck) > 0.1 then
             cachedDetected, cachedCensored = GetCurrentGameWord(frame)
             lastWordCheck = now
         end
