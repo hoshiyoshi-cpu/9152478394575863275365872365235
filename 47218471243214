@@ -2912,11 +2912,9 @@ runConn = RunService.Heartbeat:Connect(function()
                     if #detected > 2 then
                         local c = detected:sub(1,1)
                         if c ~= "#" and Buckets and Buckets[c] then
-                            for _, w in ipairs(Buckets[c]) do
-                                if w == detected then
-                                    isCompleted = true
-                                    break
-                                end
+                            local idx = BinarySearchStart(Buckets[c], detected)
+                            if idx ~= -1 and Buckets[c][idx] == detected then
+                                isCompleted = true
                             end
                         end
                     end
@@ -2935,7 +2933,7 @@ runConn = RunService.Heartbeat:Connect(function()
                 
                 if forceUpdateList then
                     listUpdatePending = true
-                    lastInputTime = now + 0.1
+                    lastInputTime = 0
                     forceUpdateList = false
                 else
                     listUpdatePending = true
