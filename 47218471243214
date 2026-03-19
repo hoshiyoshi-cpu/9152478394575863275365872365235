@@ -2831,22 +2831,16 @@ runConn = RunService.RenderStepped:Connect(function()
             local typed = textBox.Text:lower():gsub("[%s%c]+", "")
             if #typed > 0 then
                 lastManualInput = typed
-                StatusText.Text = "Tracking: " .. typed
-                StatusText.TextColor3 = THEME.Warning
             end
         end
 
         -- if the word on screen just cleared, the last input was accepted
-        if lastManualInput ~= "" then
-            local screenCleared = detected == "" and lastDetected ~= ""
-            local turnChanged = not isMyTurn and lastWasMyTurn
-            StatusText.Text = "sc:" .. tostring(screenCleared) .. " tc:" .. tostring(turnChanged) .. " det:" .. detected
-            StatusText.TextColor3 = THEME.Warning
-            if screenCleared or turnChanged then
-                UsedWords[lastManualInput] = true
-                lastManualInput = ""
-                forceUpdateList = true
-            end
+        if lastManualInput ~= "" and lastDetected ~= "---" and detected ~= lastDetected then
+            UsedWords[lastManualInput] = true
+            StatusText.Text = "Used: " .. lastManualInput
+            StatusText.TextColor3 = THEME.Success
+            lastManualInput = ""
+            forceUpdateList = true
         end
         lastWasMyTurn = isMyTurn
 
