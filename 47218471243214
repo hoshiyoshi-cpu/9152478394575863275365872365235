@@ -824,14 +824,6 @@ local function CreateDropdown(parent, text, options, default, callback)
     return container
 end
 
-local LayoutDropdown = CreateDropdown(TogglesFrame, "Layout", {"QWERTY", "QWERTZ", "AZERTY"}, keyboardLayout, function(val)
-    keyboardLayout = val
-    Config.KeyboardLayout = keyboardLayout
-    GenerateKeyboard()
-    SaveConfig()
-end)
-LayoutDropdown.Position = UDim2.new(0, 150, 0, 145)
-
 UserInputService.InputBegan:Connect(function(input)
     if not showKeyboard then return end
     if input.UserInputType == Enum.UserInputType.Keyboard then
