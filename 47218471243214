@@ -105,6 +105,7 @@ local runConn = nil
 local inputConn = nil
 local logConn = nil
 local lastManualInput = ""
+local lastWasMyTurn = false
 local unloaded = false
 local isMyTurnLogDetected = false
 local logRequiredLetters = ""
@@ -2836,12 +2837,17 @@ runConn = RunService.RenderStepped:Connect(function()
         end
 
         -- if the word on screen just cleared, the last input was accepted
-        if lastManualInput ~= "" and detected == "" and lastDetected ~= "" then
-            UsedWords[lastManualInput] = true
-            lastManualInput = ""
-            forceUpdateList = true
+        if lastManualInput ~= "" then
+            local screenCleared = detected == "" and lastDetected ~= ""
+            local turnChanged = not isMyTurn and lastWasMyTurn
+            if screenCleared or turnChanged then
+                UsedWords[lastManualInput] = true
+                lastManualInput = ""
+                forceUpdateList = true
+            end
         end
-        
+        lastWasMyTurn = isMyTurn
+
         lastTypeVisible = typeVisible
         if censored then
             if StatusText.Text ~= "Word is Censored" then
