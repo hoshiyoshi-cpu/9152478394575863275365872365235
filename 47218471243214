@@ -2296,7 +2296,7 @@ UpdateList = function(detectedText, requiredLetter)
             local useBinary = true
             if prefix:find("#") or prefix:find("%*") then useBinary = false end
             
-            if useBinary and #prefix > 0 then
+            if useBinary and #prefix > 0 and not prefix:find("#") and not prefix:find("%*") then
                 local startIndex = BinarySearchStart(bucket, prefix)
                 
                 if startIndex ~= -1 then
@@ -2311,6 +2311,13 @@ UpdateList = function(detectedText, requiredLetter)
                         count = count + 1
                         local hardLimit = (suffixMode ~= "" or lengthMode > 0) and math.huge or 3000
                         if count >= hardLimit then break end
+                    end
+                else
+                    -- Binary search missed; fall back to linear scan
+                    local searchLimit = (sortMode == "Random") and 1000 or limit
+                    for _, w in ipairs(bucket) do
+                        checkWord(w)
+                        if #exacts >= searchLimit then break end
                     end
                 end
             else
