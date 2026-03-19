@@ -2835,10 +2835,8 @@ runConn = RunService.RenderStepped:Connect(function()
         end
 
         -- if the word on screen just cleared, the last input was accepted
-        if lastManualInput ~= "" and lastDetected ~= "---" and detected ~= lastDetected then
+        if lastManualInput ~= "" and detected ~= lastManualInput and lastDetected == lastManualInput then
             UsedWords[lastManualInput] = true
-            StatusText.Text = "Used: " .. lastManualInput
-            StatusText.TextColor3 = THEME.Success
             lastManualInput = ""
             forceUpdateList = true
         end
@@ -2919,6 +2917,7 @@ runConn = RunService.RenderStepped:Connect(function()
                         StatusText.Text = "Completed: " .. detected .. " <font color=\"rgb(100,255,140)\">✓</font>"
                         StatusText.TextColor3 = THEME.Success
                         Tween(StatusDot, {BackgroundColor3 = THEME.Success})
+                        lastManualInput = detected
                     else
                         StatusText.Text = "Input: " .. detected
                         StatusText.TextColor3 = THEME.Accent
