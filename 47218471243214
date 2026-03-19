@@ -1991,7 +1991,7 @@ local function SmartType(targetWord, currentDetected, isCorrection, bypassTurn)
                      accepted = true
                      break
                 end
-                task.wait(0.05)
+                task.wait(0.1)
             end
 
             if not accepted then
@@ -2108,7 +2108,7 @@ local function SmartType(targetWord, currentDetected, isCorrection, bypassTurn)
                      accepted = true
                      break
                 end
-                task.wait(0.05)
+                task.wait(0.1)
             end
 
             if not accepted then
@@ -2680,6 +2680,12 @@ runConn = RunService.Heartbeat:Connect(function()
             isAutoPlayScheduled = false
             StatusText.Text = "Typing State Reset (Watchdog)"
             StatusText.TextColor3 = THEME.Warning
+        end
+        if isTyping then return end
+        if not isTyping and forceUpdateList then
+            listUpdatePending = true
+            lastInputTime = 0
+            forceUpdateList = false
         end
         
         local isVisible = false
