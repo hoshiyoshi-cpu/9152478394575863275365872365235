@@ -8,6 +8,7 @@ local gethui = gethui or function() return CoreGui end
 
 local CoreGui = cloneref(game:GetService("CoreGui"))
 local Players = cloneref(game:GetService("Players"))
+local LocalPlayer = Players.LocalPlayer
 local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
 local RunService = cloneref(game:GetService("RunService"))
@@ -216,10 +217,13 @@ local function LoadList(fname)
     if isfile(fname) then
         local content = readfile(fname)
         for w in content:gmatch("[^\r\n]+") do
-            local clean = w:gsub("[%s%c]+", ""):lower()
-            if #clean > 0 and not SeenWords[clean] then
-                SeenWords[clean] = true
-                table.insert(Words, clean)
+            local clean = w:match("^%a+")
+            if clean then
+                clean = clean:lower()
+                if not SeenWords[clean] then
+                    SeenWords[clean] = true
+                    Words[#Words + 1] = clean
+                end
             end
         end
         UpdateStatus("Loaded " .. #Words .. " words!", THEME.Success)
@@ -307,7 +311,7 @@ end
 local function GetCurrentGameWord(providedFrame)
     local frame = providedFrame
     if not frame then
-        local player = Players.LocalPlayer
+        local player = LocalPlayer
         local gui = player and player:FindFirstChild("PlayerGui")
         local inGame = gui and gui:FindFirstChild("InGame")
         frame = inGame and inGame:FindFirstChild("Frame")
@@ -363,7 +367,7 @@ local function GetTurnInfo(providedFrame)
 
     local frame = providedFrame
     if not frame then
-        local player = Players.LocalPlayer
+        local player = LocalPlayer
         local gui = player and player:FindFirstChild("PlayerGui")
         local inGame = gui and gui:FindFirstChild("InGame")
         frame = inGame and inGame:FindFirstChild("Frame")
@@ -373,7 +377,7 @@ local function GetTurnInfo(providedFrame)
     
     if typeLbl and typeLbl:IsA("TextLabel") then
         local text = typeLbl.Text
-        local player = Players.LocalPlayer
+        local player = LocalPlayer
         if text:sub(1, #player.Name) == player.Name or text:sub(1, #player.DisplayName) == player.DisplayName then
             local char = text:match("starting with:%s*([A-Za-z])")
             return true, char
@@ -393,7 +397,7 @@ local function GetSecureParent()
     end)
     if success and result then return result end
     
-    return Players.LocalPlayer.PlayerGui
+    return LocalPlayer.PlayerGui
 end
 
 local ParentTarget = GetSecureParent()
@@ -605,9 +609,8 @@ SearchBox.Text = ""
 SearchBox.TextXAlignment = Enum.TextXAlignment.Left
 
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-    if UpdateList then
-        UpdateList(lastDetected, lastRequiredLetter)
-    end
+    listUpdatePending = true
+    lastInputTime = tick()
 end)
 
 local ScrollList = Instance.new("ScrollingFrame", MainFrame)
@@ -1468,7 +1471,7 @@ local function FetchServers()
 
                             task.spawn(function()
                                 local success, err = pcall(function()
-                                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, srv.id, Players.LocalPlayer)
+                                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, srv.id, LocalPlayer)
                                 end)
                                 if not success then
                                     join.Text = "Failed"
@@ -1883,7 +1886,7 @@ local function PressEnter()
 end
 
 local function GetGameTextBox()
-    local player = Players.LocalPlayer
+    local player = LocalPlayer
     local gui = player and player:FindFirstChild("PlayerGui")
     local inGame = gui and gui:FindFirstChild("InGame")
     if inGame then
@@ -2171,17 +2174,13 @@ local function SmartType(targetWord, currentDetected, isCorrection, bypassTurn)
 end
 
 local function GetMatchLength(str, prefix)
-    local len = 0
+    if prefix == "" then return 0 end
     local max = math.min(#str, #prefix)
     for i = 1, max do
-        local pb = string.byte(prefix, i)
-        if pb == 35 or pb == string.byte(str, i) then
-            len = i
-        else
-            break
-        end
+        local pb = prefix:byte(i)
+        if pb ~= 35 and pb ~= str:byte(i) then return i - 1 end
     end
-    return len
+    return max
 end
 
 local function BinarySearchStart(list, prefix)
@@ -2321,7 +2320,7 @@ UpdateList = function(detectedText, requiredLetter)
                 end
             end
             
-            if sortMode == "Random" and #exacts > 0 then
+            if sortMode == "Random" and #exacts > 1 then
                 shuffleTable(exacts)
             end
         end
@@ -2668,9 +2667,11 @@ do
 end
 
 runConn = RunService.Heartbeat:Connect(function()
+    local now = tick()
+    if (now - lastLogicUpdate) < LOGIC_RATE then return end
+    lastLogicUpdate = now
     local success, err = pcall(function()
-        local now = tick()
-        local player = Players.LocalPlayer
+        local player = LocalPlayer
         local gui = player and player:FindFirstChild("PlayerGui")
         local frame = gui and gui:FindFirstChild("InGame") and gui.InGame:FindFirstChild("Frame")
 
