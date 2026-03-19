@@ -2868,6 +2868,11 @@ runConn = RunService.RenderStepped:Connect(function()
                 local textBox = UserInputService:GetFocusedTextBox()
                 if textBox and textBox.Text ~= "" then
                     lastManualInput = textBox.Text:lower():gsub("[%s%c]+", "")
+                    StatusText.Text = "Censored tracked: " .. lastManualInput
+                elseif lastManualInput ~= "" then
+                    StatusText.Text = "Censored using last: " .. lastManualInput
+                else
+                    StatusText.Text = "Censored: nothing tracked"
                 end
                 Tween(StatusDot, {BackgroundColor3 = THEME.Warning})
                 
