@@ -2444,8 +2444,10 @@ end
             end
         end
 
-        local function sortGroup(t)
-            if sortMode == "Longest" then
+        local function sortGroup(t, forceShort)
+            if forceShort or (suffixMode ~= "" and sortMode == "Random") then
+                table.sort(t, function(a, b) return #a < #b end)
+            elseif sortMode == "Longest" then
                 table.sort(t, function(a, b) return #a > #b end)
             elseif sortMode == "Shortest" or sortMode == "Random" then
                 table.sort(t, function(a, b) return #a < #b end)
@@ -2459,7 +2461,7 @@ end
             end
         end
 
-        sortGroup(filtered)
+        sortGroup(filtered, true)
         sortGroup(padding)
 
         matches = {}
