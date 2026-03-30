@@ -1185,29 +1185,37 @@ local function RefreshUsedWords()
     local blacklistedList = {}
 
     for w, _ in pairs(UsedWords) do
-        if query == "" or w:find(query, 1, true) then
-            table.insert(usedList, w)
-        end
+        table.insert(usedList, w)
     end
 
     for w, _ in pairs(Blacklist) do
-        if query == "" or w:find(query, 1, true) then
-            table.insert(blacklistedList, w)
-        end
+        table.insert(blacklistedList, w)
     end
 
-    table.sort(usedList)
-    table.sort(blacklistedList)
+    -- reverse order so last used is at top
+    local function reverseInsertOrder(t)
+        local rev = {}
+        for i = #t, 1, -1 do
+            table.insert(rev, t[i])
+        end
+        return rev
+    end
+
+    usedList = reverseInsertOrder(usedList)
+    blacklistedList = reverseInsertOrder(blacklistedList)
 
     UWCountLabel.Text = #usedList .. " used, " .. #blacklistedList .. " blacklisted"
 
     local i = 0
+    local scrollTarget = nil
+
     for _, w in ipairs(usedList) do
         i = i + 1
         local row = Instance.new("Frame", UWList)
         row.Size = UDim2.new(1, -6, 0, 22)
         row.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25, 25, 30) or Color3.fromRGB(30, 30, 35)
         row.BorderSizePixel = 0
+        row.LayoutOrder = i
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
 
         local lbl = Instance.new("TextLabel", row)
@@ -1219,6 +1227,13 @@ local function RefreshUsedWords()
         lbl.Position = UDim2.new(0, 5, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        if query ~= "" and w:find(query, 1, true) then
+            row.BackgroundColor3 = Color3.fromRGB(40, 70, 40)
+            if not scrollTarget then
+                scrollTarget = i
+            end
+        end
     end
 
     for _, w in ipairs(blacklistedList) do
@@ -1227,6 +1242,7 @@ local function RefreshUsedWords()
         row.Size = UDim2.new(1, -6, 0, 22)
         row.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25, 25, 30) or Color3.fromRGB(30, 30, 35)
         row.BorderSizePixel = 0
+        row.LayoutOrder = i
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
 
         local lbl = Instance.new("TextLabel", row)
@@ -1238,9 +1254,22 @@ local function RefreshUsedWords()
         lbl.Position = UDim2.new(0, 5, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        if query ~= "" and w:find(query, 1, true) then
+            row.BackgroundColor3 = Color3.fromRGB(70, 40, 40)
+            if not scrollTarget then
+                scrollTarget = i
+            end
+        end
     end
 
     UWList.CanvasSize = UDim2.new(0, 0, 0, UWLayout.AbsoluteContentSize.Y)
+
+    -- scroll to first match
+    if scrollTarget then
+        local targetY = (scrollTarget - 1) * 24
+        UWList.CanvasPosition = Vector2.new(0, math.max(0, targetY - 50))
+    end
 end
 
 UWSearchBox:GetPropertyChangedSignal("Text"):Connect(RefreshUsedWords)
