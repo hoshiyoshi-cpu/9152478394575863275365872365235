@@ -104,6 +104,8 @@ local lastTypingStart = 0
 local runConn = nil
 local inputConn = nil
 local logConn = nil
+local lastManualInput = ""
+local lastWasMyTurn = false
 local unloaded = false
 local isMyTurnLogDetected = false
 local logRequiredLetters = ""
@@ -118,8 +120,8 @@ local lastAutoJoinCheck = 0
 local lastWordCheck = 0
 local cachedDetected = ""
 local cachedCensored = false
-local LOGIC_RATE = 0.1
-local AUTO_JOIN_RATE = 0.5
+local LOGIC_RATE = 0.2
+local AUTO_JOIN_RATE = 1.0
 local UpdateList
 local ButtonCache = {}
 local ButtonData = {}
@@ -822,14 +824,6 @@ local function CreateDropdown(parent, text, options, default, callback)
     return container
 end
 
-local LayoutDropdown = CreateDropdown(TogglesFrame, "Layout", {"QWERTY", "QWERTZ", "AZERTY"}, keyboardLayout, function(val)
-    keyboardLayout = val
-    Config.KeyboardLayout = keyboardLayout
-    GenerateKeyboard()
-    SaveConfig()
-end)
-LayoutDropdown.Position = UDim2.new(0, 150, 0, 145)
-
 UserInputService.InputBegan:Connect(function(input)
     if not showKeyboard then return end
     if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -1093,6 +1087,23 @@ end)
 RiskyBtn.TextColor3 = riskyMistakes and Color3.fromRGB(255, 80, 80) or THEME.SubText
 RiskyBtn.Size = UDim2.new(0, 130, 0, 24)
 
+local ResetUsedBtn = Instance.new("TextButton", TogglesFrame)
+ResetUsedBtn.Text = "Reset Used Words"
+ResetUsedBtn.Font = Enum.Font.GothamMedium
+ResetUsedBtn.TextSize = 11
+ResetUsedBtn.TextColor3 = THEME.Warning
+ResetUsedBtn.BackgroundColor3 = THEME.Background
+ResetUsedBtn.Size = UDim2.new(0, 265, 0, 24)
+ResetUsedBtn.Position = UDim2.new(0, 15, 0, 145)
+Instance.new("UICorner", ResetUsedBtn).CornerRadius = UDim.new(0, 4)
+
+ResetUsedBtn.MouseButton1Click:Connect(function()
+    UsedWords = {}
+    lastManualInput = ""
+    forceUpdateList = true
+    StatusText.Text = "Used Words Reset"
+    StatusText.TextColor3 = THEME.Success
+end)
 local ManageWordsBtn = Instance.new("TextButton", TogglesFrame)
 ManageWordsBtn.Text = "Manage Custom Words"
 ManageWordsBtn.Font = Enum.Font.GothamMedium
@@ -1100,7 +1111,7 @@ ManageWordsBtn.TextSize = 11
 ManageWordsBtn.TextColor3 = THEME.Accent
 ManageWordsBtn.BackgroundColor3 = THEME.Background
 ManageWordsBtn.Size = UDim2.new(0, 130, 0, 24)
-ManageWordsBtn.Position = UDim2.new(0, 15, 0, 145)
+ManageWordsBtn.Position = UDim2.new(0, 15, 0, 175)
 Instance.new("UICorner", ManageWordsBtn).CornerRadius = UDim.new(0, 4)
 
 local WordBrowserBtn = Instance.new("TextButton", TogglesFrame)
@@ -1534,23 +1545,20 @@ do
     WBClose.BackgroundTransparency = 1
     WBClose.MouseButton1Click:Connect(function() WordBrowserFrame.Visible = false end)
 
-    local WBStartBox = Instance.new("TextBox", WordBrowserFrame)
-    WBStartBox.Font = Enum.Font.Gotham
-    WBStartBox.TextSize = 12
-    WBStartBox.BackgroundColor3 = THEME.ItemBG
-    WBStartBox.Size = UDim2.new(0.4, 0, 0, 24)
-    WBStartBox.Position = UDim2.new(0, 10, 0, 45)
-    Instance.new("UICorner", WBStartBox).CornerRadius = UDim.new(0, 4)
-    SetupPhantomBox(WBStartBox, "Starts with...")
+    local WBStartBox = nil
 
     local WBEndBox = Instance.new("TextBox", WordBrowserFrame)
     WBEndBox.Font = Enum.Font.Gotham
     WBEndBox.TextSize = 12
     WBEndBox.BackgroundColor3 = THEME.ItemBG
-    WBEndBox.Size = UDim2.new(0.4, 0, 0, 24)
-    WBEndBox.Position = UDim2.new(0.45, 0, 0, 45)
+    WBEndBox.Size = UDim2.new(0.85, 0, 0, 24)
+    WBEndBox.Position = UDim2.new(0, 10, 0, 45)
     Instance.new("UICorner", WBEndBox).CornerRadius = UDim.new(0, 4)
-    SetupPhantomBox(WBEndBox, "Ends with...")
+    WBEndBox.PlaceholderText = "Ends with... (comma separate for multiple)"
+    WBEndBox.PlaceholderColor3 = THEME.SubText
+    WBEndBox.TextColor3 = THEME.Text
+    WBEndBox.Text = ""
+    WBEndBox.ClearTextOnFocus = false
 
     local WBLengthBox = Instance.new("TextBox", WordBrowserFrame)
     WBLengthBox.Font = Enum.Font.Gotham
@@ -1588,7 +1596,7 @@ do
             if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
         end
         
-        local sVal = WBStartBox.Text
+        local sVal = ""
         local eVal = WBEndBox.Text
         local lVal = tonumber(WBLengthBox.Text)
         
@@ -1599,8 +1607,16 @@ do
         eVal = eVal:lower():gsub("[%s%c]+", "")
         
         
+        -- >>> FIX: Support multiple suffixes split by comma <
         suffixMode = eVal
         Config.SuffixMode = eVal
+        Config.SuffixModes = {}
+        for part in eVal:gmatch("[^,]+") do
+            local clean = part:gsub("[%s%c]+", "")
+            if #clean > 0 then
+                table.insert(Config.SuffixModes, clean)
+            end
+        end
         
         lengthMode = lVal or 0
         Config.LengthMode = lengthMode
@@ -1625,9 +1641,25 @@ do
         
         for _, w in ipairs(bucket) do
             local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
-            -- We can use the global vars now or local, doesn't matter much for this loop
-            local matchEnd = (eVal == "") or (w:sub(-#eVal) == eVal)
-            local matchLen = (not lVal) or (#w == lVal)
+        local matchLen = (not lVal) or (#w == lVal)
+        
+        -- >>> FIX: Check multiple suffixes in word browser <
+        local matchEnd = false
+        if eVal == "" then
+            matchEnd = true
+        else
+            local suffixList = Config.SuffixModes
+            if suffixList and #suffixList > 1 then
+                for _, s in ipairs(suffixList) do
+                    if w:sub(-#s) == s then
+                        matchEnd = true
+                        break
+                    end
+                end
+            else
+                matchEnd = w:sub(-#eVal) == eVal
+            end
+        end
             
             if matchStart and matchEnd and matchLen then
                 table.insert(results, w)
@@ -1665,10 +1697,12 @@ do
         end
         
         WBList.CanvasSize = UDim2.new(0,0,0, WBLayout.AbsoluteContentSize.Y)
+
+        lastDetected = "---"
+        forceUpdateList = true
     end
 
     WBSearchBtn.MouseButton1Click:Connect(SearchWords)
-    WBStartBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
     WBEndBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
     WBLengthBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
 
@@ -2221,7 +2255,22 @@ UpdateList = function(detectedText, requiredLetter)
                 if Blacklist[w] or UsedWords[w] then return end
                 
                 -- Check for main list filtering (suffix/length)
-                if suffixMode ~= "" and w:sub(-#suffixMode) ~= suffixMode then return end
+                -- >>> FIX: Check against all suffixes if multiple are set <
+                if suffixMode ~= "" then
+                    local suffixList = Config.SuffixModes
+                    if suffixList and #suffixList > 1 then
+                        local anyMatch = false
+                        for _, s in ipairs(suffixList) do
+                            if w:sub(-#s) == s then
+                                anyMatch = true
+                                break
+                            end
+                        end
+                        if not anyMatch then return end
+                    else
+                        if w:sub(-#suffixMode) ~= suffixMode then return end
+                    end
+                end
                 
                 local isLengthMatch = true
                 if not tryFallbackLengths and lengthMode > 0 then
@@ -2261,7 +2310,8 @@ UpdateList = function(detectedText, requiredLetter)
                         checkWord(w)
                         
                         count = count + 1
-                        if count >= 3000 then break end
+                        local hardLimit = (suffixMode ~= "" or lengthMode > 0) and math.huge or 3000
+                        if count >= hardLimit then break end
                     end
                 end
             else
@@ -2281,10 +2331,46 @@ UpdateList = function(detectedText, requiredLetter)
 
     local exacts, partials, pLen = CollectMatches(searchPrefix, false)
 
+    if #exacts > 0 and (suffixMode ~= "" or lengthMode > 0) then
+    table.sort(exacts, function(a, b)
+        local aMatch = (suffixMode == "" or a:sub(-#suffixMode) == suffixMode)
+                    and (lengthMode == 0 or #a == lengthMode)
+        local bMatch = (suffixMode == "" or b:sub(-#suffixMode) == suffixMode)
+                    and (lengthMode == 0 or #b == lengthMode)
+        if aMatch ~= bMatch then return aMatch end
+        return #a < #b
+    end)
+end
+
     if #exacts == 0 and lengthMode > 0 then
         local fallbackExacts, fallbackPartials, fallbackPLen = CollectMatches(searchPrefix, true)
         if #fallbackExacts > 0 then
              exacts = fallbackExacts
+        end
+    end
+
+    -- >>> FIX: Pad list with shortest prefix matches if under 40 results <
+    if (suffixMode ~= "" or lengthMode > 0) and #exacts < 40 then
+        local alreadyIn = {}
+        for _, w in ipairs(exacts) do alreadyIn[w] = true end
+
+        local padding = {}
+        local startIndex = BinarySearchStart(bucket, searchPrefix)
+        if startIndex ~= -1 then
+            for i = startIndex, #bucket do
+                local w = bucket[i]
+                if w:sub(1, #searchPrefix) ~= searchPrefix then break end
+                if not Blacklist[w] and not UsedWords[w] and not alreadyIn[w] then
+                    table.insert(padding, w)
+                end
+            end
+        end
+
+        table.sort(padding, function(a, b) return #a < #b end)
+
+        for _, w in ipairs(padding) do
+            if #exacts >= 40 then break end
+            table.insert(exacts, w)
         end
     end
 
@@ -2318,24 +2404,73 @@ UpdateList = function(detectedText, requiredLetter)
     end
     
     if #matches > 0 then
-        if sortMode == "Longest" then
-            table.sort(matches, function(a, b) return #a > #b end)
-        elseif sortMode == "Shortest" then
-            table.sort(matches, function(a, b) return #a < #b end)
-        elseif sortMode == "Killer" then
-            table.sort(matches, function(a, b)
-                local sA = GetKillerScore(a)
-                local sB = GetKillerScore(b)
-                if sA == sB then
-                    return #a < #b
+        -- >>> FIX: Sort filtered and padding separately to keep filtered on top <
+        local filteredCount = 0
+        for _, w in ipairs(matches) do
+            local function checkSuffix(w)
+                if suffixMode == "" then return true end
+                local suffixList = Config.SuffixModes
+                if suffixList and #suffixList > 1 then
+                    for _, s in ipairs(suffixList) do
+                        if w:sub(-#s) == s then return true end
+                    end
+                    return false
                 end
-                return sA > sB
-            end)
+                return w:sub(-#suffixMode) == suffixMode
+            end
+            local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
+            if isFiltered then filteredCount = filteredCount + 1 end
         end
+
+        local filtered = {}
+        local padding = {}
+        for _, w in ipairs(matches) do
+            local function checkSuffix(w)
+                if suffixMode == "" then return true end
+                local suffixList = Config.SuffixModes
+                if suffixList and #suffixList > 1 then
+                    for _, s in ipairs(suffixList) do
+                        if w:sub(-#s) == s then return true end
+                    end
+                    return false
+                end
+                return w:sub(-#suffixMode) == suffixMode
+            end
+            local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
+            if isFiltered then
+                table.insert(filtered, w)
+            else
+                table.insert(padding, w)
+            end
+        end
+
+        local function sortGroup(t, forceShort)
+            if forceShort or (suffixMode ~= "" and sortMode == "Random") then
+                table.sort(t, function(a, b) return #a < #b end)
+            elseif sortMode == "Longest" then
+                table.sort(t, function(a, b) return #a > #b end)
+            elseif sortMode == "Shortest" or sortMode == "Random" then
+                table.sort(t, function(a, b) return #a < #b end)
+            elseif sortMode == "Killer" then
+                table.sort(t, function(a, b)
+                    local sA = GetKillerScore(a)
+                    local sB = GetKillerScore(b)
+                    if sA == sB then return #a < #b end
+                    return sA > sB
+                end)
+            end
+        end
+
+        sortGroup(filtered, true)
+        sortGroup(padding)
+
+        matches = {}
+        for _, w in ipairs(filtered) do table.insert(matches, w) end
+        for _, w in ipairs(padding) do table.insert(matches, w) end
     end
     
     local displayList = {}
-    local maxDisplay = 40
+    local maxDisplay = 20
     for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
     
     if showKeyboard and KeyboardFrame.Visible then
@@ -2537,7 +2672,7 @@ do
     StatsData.Count = sc
 end
 
-runConn = RunService.RenderStepped:Connect(function()
+runConn = RunService.Heartbeat:Connect(function()
     local success, err = pcall(function()
         local now = tick()
         local player = Players.LocalPlayer
@@ -2696,9 +2831,32 @@ runConn = RunService.RenderStepped:Connect(function()
             StatusText.Text = "New Round - Words Reset"
             StatusText.TextColor3 = THEME.Success
         end
+
+-- >>> FIX: Track manually typed words <
+        local textBox = UserInputService:GetFocusedTextBox()
+        if textBox then
+            local typed = textBox.Text:lower():gsub("[%s%c]+", "")
+            if #typed > 0 then
+                lastManualInput = typed
+            end
+        end
+
+        -- if the word on screen just cleared, the last input was accepted
+        if lastManualInput ~= "" and detected ~= lastManualInput and lastDetected == lastManualInput then
+            UsedWords[lastManualInput] = true
+            lastManualInput = ""
+            forceUpdateList = true
+        end
+        lastWasMyTurn = isMyTurn
+
         lastTypeVisible = typeVisible
         if censored then
             if StatusText.Text ~= "Word is Censored" then
+                if lastManualInput ~= "" then
+                    UsedWords[lastManualInput] = true
+                    lastManualInput = ""
+                    forceUpdateList = true
+                end
                 StatusText.Text = "Word is Censored"
                 StatusText.TextColor3 = THEME.Warning
                 Tween(StatusDot, {BackgroundColor3 = THEME.Warning})
@@ -2771,6 +2929,7 @@ runConn = RunService.RenderStepped:Connect(function()
                         StatusText.Text = "Completed: " .. detected .. " <font color=\"rgb(100,255,140)\">✓</font>"
                         StatusText.TextColor3 = THEME.Success
                         Tween(StatusDot, {BackgroundColor3 = THEME.Success})
+                        lastManualInput = detected
                     else
                         StatusText.Text = "Input: " .. detected
                         StatusText.TextColor3 = THEME.Accent
