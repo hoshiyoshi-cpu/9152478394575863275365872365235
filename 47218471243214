@@ -112,7 +112,6 @@ local logRequiredLetters = ""
 local turnExpiryTime = 0
 local Blacklist = {}
 local UsedWords = {}
-local UsedWordsOrder = {}
 local RandomOrderCache = {}
 local RandomPriority = {}
 local lastDetected = "---"
@@ -1101,7 +1100,6 @@ Instance.new("UICorner", ResetUsedBtn).CornerRadius = UDim.new(0, 4)
 
 ResetUsedBtn.MouseButton1Click:Connect(function()
     UsedWords = {}
-    UsedWordsOrder = {}
     lastManualInput = ""
     forceUpdateList = true
     StatusText.Text = "Used Words Reset"
@@ -1186,8 +1184,8 @@ local function RefreshUsedWords()
     local usedList = {}
     local blacklistedList = {}
 
-    for i = #UsedWordsOrder, 1, -1 do
-        table.insert(usedList, UsedWordsOrder[i])
+    for w, _ in pairs(UsedWords) do
+        table.insert(usedList, w)
     end
 
     for w, _ in pairs(Blacklist) do
@@ -3050,9 +3048,6 @@ runConn = RunService.Heartbeat:Connect(function()
         if censored then
             if StatusText.Text ~= "Word is Censored" then
                 if lastManualInput ~= "" then
-                    if not UsedWords[lastManualInput] then
-                        table.insert(UsedWordsOrder, lastManualInput)
-                    end
                     UsedWords[lastManualInput] = true
                     lastManualInput = ""
                     forceUpdateList = true
