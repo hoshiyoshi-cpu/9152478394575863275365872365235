@@ -132,8 +132,9 @@ local thinkDelayMax = 1.2
 local listUpdatePending = false
 local forceUpdateList = false
 local lastInputTime = 0
-local LIST_DEBOUNCE = 0.05
+local LIST_DEBOUNCE = 0.12
 local currentBestMatch = nil
+local lastUpdateHash = ""
 
 if logConn then logConn:Disconnect() end
 logConn = LogService.MessageOut:Connect(function(message, type)
@@ -2209,6 +2210,10 @@ local function BinarySearchStart(list, prefix)
 end
 
 UpdateList = function(detectedText, requiredLetter)
+    local hash = (detectedText or "") .. "|" .. (requiredLetter or "") .. "|" .. (SearchBox.Text or "") .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
+    if hash == lastUpdateHash and not forceUpdateList then return end
+    lastUpdateHash = hash
+
     local matches = {}
     local searchPrefix = detectedText
     local isBacktracked = false
@@ -2310,8 +2315,10 @@ UpdateList = function(detectedText, requiredLetter)
                         checkWord(w)
                         
                         count = count + 1
-                        local hardLimit = (suffixMode ~= "" or lengthMode > 0) and math.huge or 3000
+                        local hardLimit = 800
+                        if #exacts >= 200 then break end
                         if count >= hardLimit then break end
+
                     end
                 end
             else
@@ -2462,7 +2469,7 @@ end
         end
 
         sortGroup(filtered, true)
-        sortGroup(padding)
+        sortGroup(padding, true)
 
         matches = {}
         for _, w in ipairs(filtered) do table.insert(matches, w) end
@@ -2470,7 +2477,7 @@ end
     end
     
     local displayList = {}
-    local maxDisplay = 20
+    local maxDisplay = 15
     for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
     
     if showKeyboard and KeyboardFrame.Visible then
