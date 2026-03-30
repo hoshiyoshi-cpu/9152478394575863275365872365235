@@ -2315,7 +2315,7 @@ UpdateList = function(detectedText, requiredLetter)
                         checkWord(w)
                         
                         count = count + 1
-                        local hardLimit = 500
+                        local hardLimit = 800
                         if #exacts >= 200 then break end
                         if count >= hardLimit then break end
 
