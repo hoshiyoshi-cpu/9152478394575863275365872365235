@@ -3008,7 +3008,7 @@ runConn = RunService.Heartbeat:Connect(function()
         end
 
         -- if the word on screen just cleared, the last input was accepted
-        if lastManualInput ~= "" and detected ~= lastManualInput and (detected == "" or #detected < #lastManualInput) then
+        if lastManualInput ~= "" and (detected == "" or #detected < #lastManualInput) then
             UsedWords[lastManualInput] = true
             lastManualInput = ""
             forceUpdateList = true
@@ -3139,4 +3139,13 @@ end)
 inputConn = UserInputService.InputBegan:Connect(function(input)
     if unloaded then return end
     if input.KeyCode == TOGGLE_KEY then ScreenGui.Enabled = not ScreenGui.Enabled end
+    if input.KeyCode == Enum.KeyCode.Return then
+        local textBox = UserInputService:GetFocusedTextBox()
+        if textBox then
+            local typed = textBox.Text:lower():gsub("[%s%c]+", "")
+            if #typed > 0 then
+                lastManualInput = typed
+            end
+        end
+    end
 end)
