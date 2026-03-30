@@ -1104,7 +1104,166 @@ ResetUsedBtn.MouseButton1Click:Connect(function()
     forceUpdateList = true
     StatusText.Text = "Used Words Reset"
     StatusText.TextColor3 = THEME.Success
+    RefreshUsedWords()
 end)
+
+local UsedWordsFrame = Instance.new("Frame", ScreenGui)
+UsedWordsFrame.Name = "UsedWordsFrame"
+UsedWordsFrame.Size = UDim2.new(0, 300, 0, 400)
+UsedWordsFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+UsedWordsFrame.BackgroundColor3 = THEME.Background
+UsedWordsFrame.Visible = false
+UsedWordsFrame.ClipsDescendants = true
+EnableDragging(UsedWordsFrame)
+Instance.new("UICorner", UsedWordsFrame).CornerRadius = UDim.new(0, 8)
+local UWStroke = Instance.new("UIStroke", UsedWordsFrame)
+UWStroke.Color = THEME.Accent
+UWStroke.Transparency = 0.5
+UWStroke.Thickness = 2
+
+local UWHeader = Instance.new("TextLabel", UsedWordsFrame)
+UWHeader.Text = "Used Words"
+UWHeader.Font = Enum.Font.GothamBold
+UWHeader.TextSize = 16
+UWHeader.TextColor3 = THEME.Text
+UWHeader.Size = UDim2.new(1, 0, 0, 40)
+UWHeader.BackgroundTransparency = 1
+
+local UWClose = Instance.new("TextButton", UsedWordsFrame)
+UWClose.Text = "X"
+UWClose.Font = Enum.Font.GothamBold
+UWClose.TextSize = 16
+UWClose.TextColor3 = Color3.fromRGB(255, 100, 100)
+UWClose.Size = UDim2.new(0, 40, 0, 40)
+UWClose.Position = UDim2.new(1, -40, 0, 0)
+UWClose.BackgroundTransparency = 1
+UWClose.MouseButton1Click:Connect(function() UsedWordsFrame.Visible = false end)
+
+local UWSearchBox = Instance.new("TextBox", UsedWordsFrame)
+UWSearchBox.Font = Enum.Font.Gotham
+UWSearchBox.TextSize = 12
+UWSearchBox.BackgroundColor3 = THEME.ItemBG
+UWSearchBox.Size = UDim2.new(1, -20, 0, 24)
+UWSearchBox.Position = UDim2.new(0, 10, 0, 45)
+UWSearchBox.PlaceholderText = "Search used words..."
+UWSearchBox.PlaceholderColor3 = THEME.SubText
+UWSearchBox.TextColor3 = THEME.Text
+UWSearchBox.Text = ""
+UWSearchBox.ClearTextOnFocus = false
+Instance.new("UICorner", UWSearchBox).CornerRadius = UDim.new(0, 4)
+
+local UWCountLabel = Instance.new("TextLabel", UsedWordsFrame)
+UWCountLabel.Font = Enum.Font.Gotham
+UWCountLabel.TextSize = 11
+UWCountLabel.TextColor3 = THEME.SubText
+UWCountLabel.Size = UDim2.new(1, -20, 0, 20)
+UWCountLabel.Position = UDim2.new(0, 10, 0, 75)
+UWCountLabel.BackgroundTransparency = 1
+UWCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+UWCountLabel.Text = "0 used, 0 blacklisted"
+
+local UWList = Instance.new("ScrollingFrame", UsedWordsFrame)
+UWList.Size = UDim2.new(1, -20, 1, -110)
+UWList.Position = UDim2.new(0, 10, 0, 100)
+UWList.BackgroundTransparency = 1
+UWList.ScrollBarThickness = 3
+UWList.ScrollBarImageColor3 = THEME.Accent
+UWList.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local UWLayout = Instance.new("UIListLayout", UWList)
+UWLayout.Padding = UDim.new(0, 2)
+UWLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function RefreshUsedWords()
+    for _, c in ipairs(UWList:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+
+    local query = UWSearchBox.Text:lower():gsub("[%s%c]+", "")
+
+    local usedList = {}
+    local blacklistedList = {}
+
+    for w, _ in pairs(UsedWords) do
+        if query == "" or w:find(query, 1, true) then
+            table.insert(usedList, w)
+        end
+    end
+
+    for w, _ in pairs(Blacklist) do
+        if query == "" or w:find(query, 1, true) then
+            table.insert(blacklistedList, w)
+        end
+    end
+
+    table.sort(usedList)
+    table.sort(blacklistedList)
+
+    UWCountLabel.Text = #usedList .. " used, " .. #blacklistedList .. " blacklisted"
+
+    local i = 0
+    for _, w in ipairs(usedList) do
+        i = i + 1
+        local row = Instance.new("Frame", UWList)
+        row.Size = UDim2.new(1, -6, 0, 22)
+        row.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25, 25, 30) or Color3.fromRGB(30, 30, 35)
+        row.BorderSizePixel = 0
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
+
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Text = w
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextColor3 = THEME.Success
+        lbl.Size = UDim2.new(1, -10, 1, 0)
+        lbl.Position = UDim2.new(0, 5, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    for _, w in ipairs(blacklistedList) do
+        i = i + 1
+        local row = Instance.new("Frame", UWList)
+        row.Size = UDim2.new(1, -6, 0, 22)
+        row.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25, 25, 30) or Color3.fromRGB(30, 30, 35)
+        row.BorderSizePixel = 0
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
+
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Text = w .. " (blacklisted)"
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+        lbl.Size = UDim2.new(1, -10, 1, 0)
+        lbl.Position = UDim2.new(0, 5, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    UWList.CanvasSize = UDim2.new(0, 0, 0, UWLayout.AbsoluteContentSize.Y)
+end
+
+UWSearchBox:GetPropertyChangedSignal("Text"):Connect(RefreshUsedWords)
+
+local ViewUsedBtn = Instance.new("TextButton", TogglesFrame)
+ViewUsedBtn.Text = "View Used Words"
+ViewUsedBtn.Font = Enum.Font.GothamMedium
+ViewUsedBtn.TextSize = 11
+ViewUsedBtn.TextColor3 = THEME.SubText
+ViewUsedBtn.BackgroundColor3 = THEME.Background
+ViewUsedBtn.Size = UDim2.new(0, 265, 0, 24)
+ViewUsedBtn.Position = UDim2.new(0, 15, 0, 233)
+Instance.new("UICorner", ViewUsedBtn).CornerRadius = UDim.new(0, 4)
+
+ViewUsedBtn.MouseButton1Click:Connect(function()
+    UsedWordsFrame.Visible = not UsedWordsFrame.Visible
+    UsedWordsFrame.Parent = nil
+    UsedWordsFrame.Parent = ScreenGui
+    if UsedWordsFrame.Visible then
+        RefreshUsedWords()
+    end
+end)
+
 local ManageWordsBtn = Instance.new("TextButton", TogglesFrame)
 ManageWordsBtn.Text = "Manage Custom Words"
 ManageWordsBtn.Font = Enum.Font.GothamMedium
