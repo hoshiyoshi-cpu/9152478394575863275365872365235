@@ -1193,18 +1193,6 @@ local function RefreshUsedWords()
         table.insert(blacklistedList, w)
     end
 
-    -- reverse order so last used is at top
-    local function reverseInsertOrder(t)
-        local rev = {}
-        for i = #t, 1, -1 do
-            table.insert(rev, t[i])
-        end
-        return rev
-    end
-
-    usedList = reverseInsertOrder(usedList)
-    blacklistedList = reverseInsertOrder(blacklistedList)
-
     UWCountLabel.Text = #usedList .. " used, " .. #blacklistedList .. " blacklisted"
 
     local i = 0
@@ -3032,9 +3020,25 @@ runConn = RunService.Heartbeat:Connect(function()
 -- >>> FIX: Track manually typed words <
         local textBox = UserInputService:GetFocusedTextBox()
         if textBox then
-            local typed = textBox.Text:lower():gsub("[%s%c]+", "")
-            if #typed > 0 then
-                lastManualInput = typed
+            local isUIFrame = false
+            local checkParent = textBox
+            while checkParent do
+                if checkParent.Name == "UsedWordsFrame" or 
+                   checkParent.Name == "CustomWordsFrame" or 
+                   checkParent.Name == "WordBrowser" or 
+                   checkParent.Name == "ServerBrowser" or
+                   checkParent:IsA("TextBox") and (checkParent.PlaceholderText or checkParent.PlaceholderColor3) then
+                   isUIFrame = true
+                   break
+                end
+                checkParent = checkParent.parent
+            end
+
+            if not isUIFrame then
+                local typed = textBox.Text:lower():gsub("[%s%c]+", "")
+                if #typed > 0 then
+                    lastManualInput = typed
+                end
             end
         end
 
