@@ -3008,7 +3008,7 @@ runConn = RunService.Heartbeat:Connect(function()
         end
 
         -- if the word on screen just cleared, the last input was accepted
-        if lastManualInput ~= "" and detected == "" and lastDetected ~= "" then
+        if lastManualInput ~= "" and detected ~= lastManualInput and (detected == "" or #detected < #lastManualInput) then
             UsedWords[lastManualInput] = true
             lastManualInput = ""
             forceUpdateList = true
