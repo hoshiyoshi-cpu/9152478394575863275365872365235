@@ -2213,7 +2213,7 @@ UpdateList = function(detectedText, requiredLetter)
     local hash = (detectedText or "") .. "|" .. (requiredLetter or "") .. "|" .. (SearchBox.Text or "") .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
     if hash == lastUpdateHash and not forceUpdateList then return end
     lastUpdateHash = hash
-    
+
     local matches = {}
     local searchPrefix = detectedText
     local isBacktracked = false
@@ -2316,7 +2316,7 @@ UpdateList = function(detectedText, requiredLetter)
                         
                         count = count + 1
                         local hardLimit = 500
-                        if #exacts >= 100 then break end
+                        if #exacts >= 200 then break end
                         if count >= hardLimit then break end
 
                     end
@@ -2469,7 +2469,7 @@ end
         end
 
         sortGroup(filtered, true)
-        sortGroup(padding)
+        sortGroup(padding, true)
 
         matches = {}
         for _, w in ipairs(filtered) do table.insert(matches, w) end
