@@ -2630,24 +2630,12 @@ end
         end
 
         local function sortGroup(t, forceShort)
-            if forceShort then
-                table.sort(t, function(a, b)
-                    local lenDiff = #a - #b
-                    if lenDiff == 0 then return math.random() > 0.5 end
-                    local jitter = math.random(-1, 1)
-                    return (lenDiff + jitter) < 0
-                end)
+            if forceShort or (suffixMode ~= "" and sortMode == "Random") then
+                table.sort(t, function(a, b) return #a < #b end)
             elseif sortMode == "Longest" then
                 table.sort(t, function(a, b) return #a > #b end)
-            elseif sortMode == "Shortest" then
+            elseif sortMode == "Shortest" or sortMode == "Random" then
                 table.sort(t, function(a, b) return #a < #b end)
-            elseif sortMode == "Random" then
-                table.sort(t, function(a, b)
-                    local lenDiff = #a - #b
-                    if lenDiff == 0 then return math.random() > 0.5 end
-                    local jitter = math.random(-2, 2)
-                    return (lenDiff + jitter) < 0
-                end)
             elseif sortMode == "Killer" then
                 table.sort(t, function(a, b)
                     local sA = GetKillerScore(a)
