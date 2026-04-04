@@ -1152,12 +1152,15 @@ Instance.new("UICorner", UWCopyBtn).CornerRadius = UDim.new(0, 6)
 
 UWCopyBtn.MouseButton1Click:Connect(function()
     local lines = {}
-    for w, _ in pairs(UsedWords) do
-        table.insert(lines, w)
+    for w, t in pairs(UsedWords) do
+        table.insert(lines, {word = w, time = t})
     end
-    table.sort(lines)
-    local result = table.concat(lines, "\n")
-    setclipboard(result)
+    table.sort(lines, function(a, b) return a.time > b.time end)
+    local result = {}
+    for _, entry in ipairs(lines) do
+        table.insert(result, entry.word)
+    end
+    setclipboard(table.concat(result, "\n"))
     UWCopyBtn.Text = "Copied!"
     UWCopyBtn.TextColor3 = THEME.Success
     task.delay(2, function()
