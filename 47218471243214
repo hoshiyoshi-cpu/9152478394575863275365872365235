@@ -1139,6 +1139,33 @@ UWClose.Position = UDim2.new(1, -40, 0, 0)
 UWClose.BackgroundTransparency = 1
 UWClose.MouseButton1Click:Connect(function() UsedWordsFrame.Visible = false end)
 
+-- Add this after the UWClose button definition
+local UWCopyBtn = Instance.new("TextButton", UsedWordsFrame)
+UWCopyBtn.Text = "Copy All"
+UWCopyBtn.Font = Enum.Font.GothamBold
+UWCopyBtn.TextSize = 13
+UWCopyBtn.TextColor3 = THEME.Accent
+UWCopyBtn.BackgroundColor3 = THEME.ItemBG
+UWCopyBtn.Size = UDim2.new(0, 80, 0, 28)
+UWCopyBtn.Position = UDim2.new(0, 10, 1, -38)
+Instance.new("UICorner", UWCopyBtn).CornerRadius = UDim.new(0, 6)
+
+UWCopyBtn.MouseButton1Click:Connect(function()
+    local lines = {}
+    for w, _ in pairs(UsedWords) do
+        table.insert(lines, w)
+    end
+    table.sort(lines)
+    local result = table.concat(lines, "\n")
+    setclipboard(result)
+    UWCopyBtn.Text = "Copied!"
+    UWCopyBtn.TextColor3 = THEME.Success
+    task.delay(2, function()
+        UWCopyBtn.Text = "Copy All"
+        UWCopyBtn.TextColor3 = THEME.Accent
+    end)
+end)
+
 local UWSearchBox = Instance.new("TextBox", UsedWordsFrame)
 UWSearchBox.Font = Enum.Font.Gotham
 UWSearchBox.TextSize = 12
@@ -1163,7 +1190,7 @@ UWCountLabel.TextXAlignment = Enum.TextXAlignment.Left
 UWCountLabel.Text = "0 used, 0 blacklisted"
 
 local UWList = Instance.new("ScrollingFrame", UsedWordsFrame)
-UWList.Size = UDim2.new(1, -20, 1, -110)
+UWList.Size = UDim2.new(1, -20, 1, -150)
 UWList.Position = UDim2.new(0, 10, 0, 100)
 UWList.BackgroundTransparency = 1
 UWList.ScrollBarThickness = 3
