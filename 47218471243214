@@ -2541,7 +2541,7 @@ UpdateList = function(detectedText, requiredLetter)
                         local exactLimit = 500
 
                         if suffixMode ~= "" or lengthMode > 0 then
-                            hardLimit = 5000
+                            hardLimit = 4000
                             exactLimit = 500
                         end
 
@@ -2605,7 +2605,7 @@ end
         table.sort(padding, function(a, b) return #a < #b end)
 
         for _, w in ipairs(padding) do
-            if #exacts >= 40 then break end
+            if #exacts >= 30 then break end
             table.insert(exacts, w)
         end
     end
