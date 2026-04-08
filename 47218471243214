@@ -2456,88 +2456,125 @@ UpdateList = function(detectedText, requiredLetter)
         bucket = Words
     end
     
-local function CollectMatches(prefix, tryFallbackLengths)
+    local function CollectMatches(prefix, tryFallbackLengths)
         local exacts = {}
-        local fallbackExacts = {}
         local partials = {}
         local maxPartialLen = 0
-        local limit = 100
         
-        if bucket then
-            local checkWord = function(w)
-                if Blacklist[w] or UsedWords[w] then return end
-                
-                if suffixMode ~= "" then
-                    local suffixList = Config.SuffixModes
-                    if suffixList and #suffixList > 1 then
-                        local anyMatch = false
-                        for _, s in ipairs(suffixList) do
-                            if w:sub(-#s) == s then
-                                anyMatch = true
-                                break
+        -- PRIORITY 1: Check custom words FIRST
+        if Config.CustomWords and #Config.CustomWords > 0 then
+            for _, w in ipairs(Config.CustomWords) do
+                if not Blacklist[w] and not UsedWords[w] then
+                    local suffixMatch = true
+                    if suffixMode ~= "" then
+                        local suffixList = Config.SuffixModes
+                        if suffixList and #suffixList > 0 then
+                            suffixMatch = false
+                            for _, s in ipairs(suffixList) do
+                                if w:sub(-#s) == s then
+                                    suffixMatch = true
+                                    break
+                                end
+                            end
+                        else
+                            suffixMatch = w:sub(-#suffixMode) == suffixMode
+                        end
+                    end
+                    
+                    local isLengthMatch = true
+                    if not tryFallbackLengths and lengthMode > 0 then
+                        isLengthMatch = (#w == lengthMode)
+                    end
+                    
+                    if suffixMatch and isLengthMatch then
+                        local mLen = GetMatchLength(w, prefix)
+                        if mLen == #prefix then
+                            table.insert(exacts, w)
+                        elseif #exacts == 0 then
+                            if mLen > maxPartialLen then
+                                maxPartialLen = mLen
+                                partials = {w}
+                            elseif mLen == maxPartialLen and mLen > 0 then
+                                if #partials < 50 then table.insert(partials, w) end
                             end
                         end
-                        if not anyMatch then return end
-                    else
-                        if w:sub(-#suffixMode) ~= suffixMode then return end
                     end
                 end
-                
-                local isLengthMatch = true
-                if not tryFallbackLengths and lengthMode > 0 then
-                    isLengthMatch = (#w == lengthMode)
-                elseif tryFallbackLengths and lengthMode > 0 then
-                    isLengthMatch = true
-                end
-                
-                if not isLengthMatch then return end
-
-                local mLen = GetMatchLength(w, prefix)
-                if mLen == #prefix then
-                    table.insert(exacts, w)
-                elseif #exacts == 0 then
-                    if mLen > maxPartialLen then
-                        maxPartialLen = mLen
-                        partials = {w}
-                    elseif mLen == maxPartialLen and mLen > 0 then
-                        if #partials < 50 then table.insert(partials, w) end
-                    end
-                end
-            end
-
-            local useBinary = true
-            if prefix:find("#") or prefix:find("%*") then useBinary = false end
-            
-            if useBinary and #prefix > 0 then
-                local startIndex = BinarySearchStart(bucket, prefix)
-                
-                if startIndex ~= -1 then
-                    local count = 0
-                    for i = startIndex, #bucket do
-                        local w = bucket[i]
-                        
-                        if w:sub(1, #prefix) ~= prefix then break end
-                        
-                        checkWord(w)
-                        
-                        count = count + 1
-                        local hardLimit = 800
-                        if #exacts >= 200 then break end
-                        if count >= hardLimit then break end
-                    end
-                end
-            else
-                local searchLimit = (sortMode == "Random") and 1000 or limit
-                for _, w in ipairs(bucket) do
-                    checkWord(w)
-                    if #exacts >= searchLimit then break end
-                end
-            end
-            
-            if sortMode == "Random" and #exacts > 0 then
-                shuffleTable(exacts)
             end
         end
+        
+        -- PRIORITY 2: Main word list
+        if bucket then
+            local maxToCheck = (suffixMode ~= "" or lengthMode > 0) and 1500 or 600
+            
+            local startIndex = 1
+            if #prefix > 0 then
+                startIndex = BinarySearchStart(bucket, prefix)
+                if startIndex == -1 then startIndex = 1 end
+            end
+            
+            local checked = 0
+            for i = startIndex, #bucket do
+                local w = bucket[i]
+                
+                local skipWord = false
+                
+                if #prefix > 0 and w:sub(1, #prefix) ~= prefix then
+                    if checked > 100 then break end
+                    skipWord = true
+                end
+                
+                if not skipWord then
+                    local isCustom = false
+                    if Config.CustomWords then
+                        for _, cw in ipairs(Config.CustomWords) do
+                            if cw == w then isCustom = true break end
+                        end
+                    end
+                    
+                    if not isCustom and not Blacklist[w] and not UsedWords[w] then
+                        local suffixMatch = true
+                        if suffixMode ~= "" then
+                            local suffixList = Config.SuffixModes
+                            if suffixList and #suffixList > 0 then
+                                suffixMatch = false
+                                for _, s in ipairs(suffixList) do
+                                    if w:sub(-#s) == s then
+                                        suffixMatch = true
+                                        break
+                                    end
+                                end
+                            else
+                                suffixMatch = w:sub(-#suffixMode) == suffixMode
+                            end
+                        end
+                        
+                        local isLengthMatch = true
+                        if not tryFallbackLengths and lengthMode > 0 then
+                            isLengthMatch = (#w == lengthMode)
+                        end
+                        
+                        if suffixMatch and isLengthMatch then
+                            local mLen = GetMatchLength(w, prefix)
+                            if mLen == #prefix then
+                                table.insert(exacts, w)
+                            elseif #exacts == 0 then
+                                if mLen > maxPartialLen then
+                                    maxPartialLen = mLen
+                                    partials = {w}
+                                elseif mLen == maxPartialLen and mLen > 0 then
+                                    if #partials < 50 then table.insert(partials, w) end
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                checked = checked + 1
+                if checked >= maxToCheck and #exacts >= 30 then break end
+            end
+        end
+        
         return exacts, partials, maxPartialLen
     end
 
