@@ -2474,7 +2474,7 @@ UpdateList = function(detectedText, requiredLetter)
         local fallbackExacts = {}
         local partials = {}
         local maxPartialLen = 0
-        local limit = 100
+        local limit = 80
         
         if bucket then
             local checkWord = function(w)
