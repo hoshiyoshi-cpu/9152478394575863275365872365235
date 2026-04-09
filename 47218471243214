@@ -127,7 +127,6 @@ local Blacklist = {}
 local UsedWords = {}
 local RandomOrderCache = {}
 local RandomPriority = {}
-local SuffixCache = {}
 local lastDetected = "---"
 local lastLogicUpdate = 0
 local lastAutoJoinCheck = 0
@@ -1817,30 +1816,6 @@ do
 
 
     local function SearchWords()
-        local eVal = WBEndBox.Text
-        local lVal = tonumber(WBLengthBox.Text)
-        local cacheKey = eVal .. "|" .. tostring(lVal)
-
-        for _, c in ipairs(WBList:GetChildren()) do
-            if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
-        end
-
-        local results = SuffixCache[cacheKey]
-
-        if not results then
-            -- Use cached results
-            local results = SuffixCache[cacheKey]
-            -- Clear and display cached results
-            for _, c in ipairs(WBList:GetChildren()) do
-                if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
-            end
-            for i, w in ipairs(results) do
-                -- Your existing display code here (copy from below)
-            end
-            WBList.CanvasSize = UDim2.new(0,0,0, #results * 24)
-            return
-        end
-
         for _, c in ipairs(WBList:GetChildren()) do
             if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
         end
@@ -1949,7 +1924,6 @@ do
 
         lastDetected = "---"
         forceUpdateList = true
-        SuffixCache[cacheKey] = results
     end
 
     WBSearchBtn.MouseButton1Click:Connect(SearchWords)
