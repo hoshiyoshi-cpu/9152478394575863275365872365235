@@ -3148,7 +3148,6 @@ runConn = RunService.Heartbeat:Connect(function()
                 
                 task.spawn(function()
                     UpdateList("", requiredLetter)
-                end)
                 listUpdatePending = false
                 
                 local visCount = 0
@@ -3184,20 +3183,15 @@ runConn = RunService.Heartbeat:Connect(function()
                 end
                 
                 if forceUpdateList then
-                    listUpdatePending = true
-                    lastInputTime = 0
+                    listUpdatePending = false
                     forceUpdateList = false
+                    task.spawn(function()
+                        UpdateList(detected, requiredLetter)
+                    end)
                 else
                     listUpdatePending = true
                     lastInputTime = now
                 end
-
-                task.spawn(function()
-                    if listUpdatePending then
-                        listUpdatePending = false
-                        UpdateList(detected, requiredLetter)
-                    end
-                end)
             end
         end
 
