@@ -2435,7 +2435,6 @@ end
 UpdateList = function(detectedText, requiredLetter)
     local hash = (detectedText or "") .. "|" .. (requiredLetter or "") .. "|" .. (SearchBox.Text or "") .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
     if hash == lastUpdateHash and not forceUpdateList then return end
-    if sortMode == "Random" then forceUpdateList = true end
     lastUpdateHash = hash
 
     local matches = {}
@@ -2674,11 +2673,26 @@ end
                     return a < b
                 end)
             else
-                table.sort(t, function(a, b)
-                    local diff = #a - #b
-                    if math.abs(diff) > 3 then return diff < 0 end
-                    return math.random() < 0.5
-                end)
+                local byLength = {}
+                for _, word in ipairs(t) do
+                    local len = #word
+                    if not byLength[len] then byLength[len] = {} end
+                    table.insert(byLength[len], word)
+                end
+                for _, group in pairs(byLength) do
+                    for i = #group, 2, -1 do
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
+                    end
+                end
+                for i = #t, 1, -1 do t[i] = nil end
+                for len = 1, 50 do
+                    if byLength[len] then
+                        for _, word in ipairs(byLength[len]) do
+                            table.insert(t, word)
+                        end
+                    end
+                end
             end
         end
 
