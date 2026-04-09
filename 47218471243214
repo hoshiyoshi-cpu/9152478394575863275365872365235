@@ -2642,10 +2642,9 @@ end
     end
     
     if #matches > 0 then
-        -- Split filtered and padding
         local filtered = {}
         local padding = {}
-    
+
         local function checkSuffix(w)
             if suffixMode == "" then return true end
             local suffixList = Config.SuffixModes
@@ -2657,7 +2656,7 @@ end
             end
             return w:sub(-#suffixMode) == suffixMode
         end
-    
+
         for _, w in ipairs(matches) do
             local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
             if isFiltered then
@@ -2666,11 +2665,43 @@ end
                 table.insert(padding, w)
             end
         end
-    
-        -- Apply sorting based on selected mode
-        filtered = sortGroup(filtered, sortMode)
-        padding = sortGroup(padding, sortMode)
-    
+
+        local function ApplySort(t, mode)
+            if mode == "Shortest" then
+                table.sort(t, function(a, b)
+                    if #a ~= #b then return #a < #b end
+                    return a < b
+                end)
+            else
+                -- Random mode: shortest first, shuffled within same length
+                local byLength = {}
+                for _, word in ipairs(t) do
+                    local len = #word
+                    if not byLength[len] then byLength[len] = {} end
+                    table.insert(byLength[len], word)
+                end
+                for _, group in pairs(byLength) do
+                    for i = #group, 2, -1 do
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
+                    end
+                end
+                local result = {}
+                for len = 1, 50 do
+                    if byLength[len] then
+                        for _, word in ipairs(byLength[len]) do
+                            table.insert(result, word)
+                        end
+                    end
+                end
+                for i = #t, 1, -1 do t[i] = nil end
+                for _, word in ipairs(result) do table.insert(t, word) end
+            end
+        end
+
+        ApplySort(filtered, sortMode)
+        ApplySort(padding, sortMode)
+
         matches = {}
         for _, w in ipairs(filtered) do table.insert(matches, w) end
         for _, w in ipairs(padding) do table.insert(matches, w) end
