@@ -2687,25 +2687,26 @@ end
                 -- Shuffle within each range
                 for _, group in pairs(ranges) do
                     for i = #group, 2, -1 do
-                    local j = math.random(i)
-                    group[i], group[j] = group[j], group[i]
-                end
-            end
-        
-            -- Flatten ranges in order (all 1-3 length words first, then 4-6, etc.)
-            local result = {}
-            for bucket = 0, 20 do
-                if ranges[bucket] then
-                    for _, word in ipairs(ranges[bucket]) do
-                        table.insert(result, word)
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
                     end
                 end
-            end
         
-            -- Replace original table
-            for i = #t, 1, -1 do t[i] = nil end
-            for i, word in ipairs(result) do
-                t[i] = word
+                -- Flatten ranges in order (all 1-3 length words first, then 4-6, etc.)
+                local result = {}
+                for bucket = 0, 20 do
+                    if ranges[bucket] then
+                        for _, word in ipairs(ranges[bucket]) do
+                            table.insert(result, word)
+                        end
+                    end
+                end
+        
+                -- Replace original table
+                for i = #t, 1, -1 do t[i] = nil end
+                for i, word in ipairs(result) do
+                    t[i] = word
+                end
             end
         end
 
