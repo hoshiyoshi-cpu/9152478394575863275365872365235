@@ -1817,59 +1817,41 @@ do
 
 
     local function SearchWords()
-        -- Clear old results
-        for _, c in ipairs(WBList:GetChildren()) do
-            if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then 
-                c:Destroy() 
-            end
-        end
-    
-        local sVal = ""
+        -- ADD THIS CACHE CHECK AT THE VERY START
         local eVal = WBEndBox.Text
         local lVal = tonumber(WBLengthBox.Text)
-    
-        if sVal == "Starts with..." then sVal = "" end
-        if eVal == "Ends with..." then eVal = "" end
-    
-        sVal = sVal:lower():gsub("[%s%c]+", "")
-        eVal = eVal:lower():gsub("[%s%c]+", "")
-    
-        -- CHECK CACHE FIRST (Optimization #1)
         local cacheKey = eVal .. "|" .. tostring(lVal)
+    
         if SuffixCache[cacheKey] then
-            -- Display cached results instantly
+            -- Use cached results
             local results = SuffixCache[cacheKey]
+            -- Clear and display cached results
+            for _, c in ipairs(WBList:GetChildren()) do
+                if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
+            end
             for i, w in ipairs(results) do
-                local row = Instance.new("TextButton", WBList)
-                row.Size = UDim2.new(1, -6, 0, 22)
-                row.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)
-                row.Text = ""
-                row.AutoButtonColor = false
-                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
-            
-                row.MouseButton1Click:Connect(function()
-                    SmartType(w, lastDetected, true, true)
-                    Tween(row, {BackgroundColor3 = THEME.Accent}, 0.2)
-                    task.delay(0.2, function()
-                        Tween(row, {BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)}, 0.2)
-                    end)
-                end)
-            
-                local lbl = Instance.new("TextLabel", row)
-                lbl.Text = w
-                lbl.Font = Enum.Font.Gotham
-                lbl.TextSize = 12
-                lbl.TextColor3 = THEME.Text
-                lbl.Size = UDim2.new(1, -10, 1, 0)
-                lbl.Position = UDim2.new(0, 5, 0, 0)
-                lbl.BackgroundTransparency = 1
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                -- Your existing display code here (copy from below)
             end
             WBList.CanvasSize = UDim2.new(0,0,0, #results * 24)
             return
         end
-    
-        -- Parse suffix modes
+
+        for _, c in ipairs(WBList:GetChildren()) do
+            if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
+        end
+        
+        local sVal = ""
+        local eVal = WBEndBox.Text
+        local lVal = tonumber(WBLengthBox.Text)
+        
+        if sVal == "Starts with..." then sVal = "" end
+        if eVal == "Ends with..." then eVal = "" end
+        
+        sVal = sVal:lower():gsub("[%s%c]+", "")
+        eVal = eVal:lower():gsub("[%s%c]+", "")
+        
+        
+        -- >>> FIX: Support multiple suffixes split by comma <
         suffixMode = eVal
         Config.SuffixMode = eVal
         Config.SuffixModes = {}
@@ -1879,62 +1861,56 @@ do
                 table.insert(Config.SuffixModes, clean)
             end
         end
-    
+        
         lengthMode = lVal or 0
         Config.LengthMode = lengthMode
-    
+        
         -- Trigger main list update
         if UpdateList then
             UpdateList(lastDetected, lastRequiredLetter)
         end
-    
-        if sVal == "" and eVal == "" and not lVal then return end
-    
-        -- SEARCH WITH OPTIMIZATIONS (#2 and #3)
-        local results = {}
-        local suffixList = Config.SuffixModes
-    
-        -- Optimization #3: Create pattern for single check instead of multiple loops
-        local suffixPattern = nil
-        if #suffixList > 0 then
-            suffixPattern = "(" .. table.concat(suffixList, "|") .. ")$"
-        end
-    
-        for _, w in ipairs(Words) do
-            local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
         
-            -- Optimization #3: Single pattern match instead of loop
-            local matchEnd = false
-            if eVal == "" then
-                matchEnd = true
-            elseif suffixPattern then
-                matchEnd = w:match(suffixPattern) ~= nil
+        if sVal == "" and eVal == "" and not lVal then return end
+        
+        local results = {}
+        local limit = 200
+        
+        local bucket = Words
+        if sVal ~= "" then
+            local c = sVal:sub(1,1)
+            if Buckets and Buckets[c] then
+                bucket = Buckets[c]
+            end
+        end
+        
+        for _, w in ipairs(bucket) do
+            local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
+        local matchLen = (not lVal) or (#w == lVal)
+        
+        -- >>> FIX: Check multiple suffixes in word browser <
+        local matchEnd = false
+        if eVal == "" then
+            matchEnd = true
+        else
+            local suffixList = Config.SuffixModes
+            if suffixList and #suffixList > 1 then
+                for _, s in ipairs(suffixList) do
+                    if w:sub(-#s) == s then
+                        matchEnd = true
+                        break
+                    end
+                end
             else
                 matchEnd = w:sub(-#eVal) == eVal
             end
-        
-            local matchLen = (not lVal) or (#w == lVal)
-        
+        end
+            
             if matchStart and matchEnd and matchLen then
                 table.insert(results, w)
-                -- Optimization #2: Stop at 200 results (your original limit)
-                if #results >= 200 then
-                    break
-                end
+                if #results >= limit then break end
             end
         end
-    
-        -- Save to cache for next time
-        SuffixCache[cacheKey] = results
-    
-        -- Clean old cache entries (older than 30 seconds)
-        for key, data in pairs(SuffixCache) do
-            if tick() - (data.timestamp or 0) > 30 then
-             SuffixCache[key] = nil
-            end
-        end
-    
-        -- Display results
+        
         for i, w in ipairs(results) do
             local row = Instance.new("TextButton", WBList)
             row.Size = UDim2.new(1, -6, 0, 22)
@@ -1942,15 +1918,15 @@ do
             row.Text = ""
             row.AutoButtonColor = false
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
-        
+            
             row.MouseButton1Click:Connect(function()
                 SmartType(w, lastDetected, true, true)
                 Tween(row, {BackgroundColor3 = THEME.Accent}, 0.2)
                 task.delay(0.2, function()
-                    Tween(row, {BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)}, 0.2)
+                     Tween(row, {BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)}, 0.2)
                 end)
             end)
-        
+            
             local lbl = Instance.new("TextLabel", row)
             lbl.Text = w
             lbl.Font = Enum.Font.Gotham
@@ -1960,12 +1936,15 @@ do
             lbl.Position = UDim2.new(0, 5, 0, 0)
             lbl.BackgroundTransparency = 1
             lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            -- Removed nested invisible button to fix click handling
         end
-    
-        WBList.CanvasSize = UDim2.new(0,0,0, #results * 24)
-    
+        
+        WBList.CanvasSize = UDim2.new(0,0,0, WBLayout.AbsoluteContentSize.Y)
+
         lastDetected = "---"
         forceUpdateList = true
+        SuffixCache[cacheKey] = results
     end
 
     WBSearchBtn.MouseButton1Click:Connect(SearchWords)
