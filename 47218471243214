@@ -1819,21 +1819,20 @@ do
     local SuffixCache = {}
 
     local function SearchWords()
-        local eVal = WBEndBox.Text
-        local lVal = tonumber(WBLengthBox.Text)
-        local cacheKey = eVal .. "|" .. tostring(lVal)
-
         for _, c in ipairs(WBList:GetChildren()) do
             if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
         end
-
+        
         local sVal = ""
+        local eVal = WBEndBox.Text
+        local lVal = tonumber(WBLengthBox.Text)
+        
         if sVal == "Starts with..." then sVal = "" end
         if eVal == "Ends with..." then eVal = "" end
-
+        
         sVal = sVal:lower():gsub("[%s%c]+", "")
         eVal = eVal:lower():gsub("[%s%c]+", "")
-
+        
         suffixMode = eVal
         Config.SuffixMode = eVal
         Config.SuffixModes = {}
@@ -1843,22 +1842,23 @@ do
                 table.insert(Config.SuffixModes, clean)
             end
         end
-
+        
         lengthMode = lVal or 0
         Config.LengthMode = lengthMode
-
+        
         if UpdateList then
             UpdateList(lastDetected, lastRequiredLetter)
         end
-
+        
         if sVal == "" and eVal == "" and not lVal then return end
 
+        local cacheKey = eVal .. "|" .. tostring(lVal)
         local results = SuffixCache[cacheKey]
 
         if not results then
             results = {}
             local limit = 200
-
+            
             local bucket = Words
             if sVal ~= "" then
                 local c = sVal:sub(1,1)
@@ -1866,11 +1866,11 @@ do
                     bucket = Buckets[c]
                 end
             end
-
+            
             for _, w in ipairs(bucket) do
                 local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
                 local matchLen = (not lVal) or (#w == lVal)
-
+                
                 local matchEnd = false
                 if eVal == "" then
                     matchEnd = true
@@ -1887,7 +1887,7 @@ do
                         matchEnd = w:sub(-#eVal) == eVal
                     end
                 end
-
+                    
                 if matchStart and matchEnd and matchLen then
                     table.insert(results, w)
                     if #results >= limit then break end
@@ -1896,7 +1896,7 @@ do
 
             SuffixCache[cacheKey] = results
         end
-
+        
         for i, w in ipairs(results) do
             local row = Instance.new("TextButton", WBList)
             row.Size = UDim2.new(1, -6, 0, 22)
@@ -1904,7 +1904,7 @@ do
             row.Text = ""
             row.AutoButtonColor = false
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
-
+            
             row.MouseButton1Click:Connect(function()
                 SmartType(w, lastDetected, true, true)
                 Tween(row, {BackgroundColor3 = THEME.Accent}, 0.2)
@@ -1912,7 +1912,7 @@ do
                     Tween(row, {BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)}, 0.2)
                 end)
             end)
-
+            
             local lbl = Instance.new("TextLabel", row)
             lbl.Text = w
             lbl.Font = Enum.Font.Gotham
@@ -1923,23 +1923,12 @@ do
             lbl.BackgroundTransparency = 1
             lbl.TextXAlignment = Enum.TextXAlignment.Left
         end
-
+        
         WBList.CanvasSize = UDim2.new(0,0,0, WBLayout.AbsoluteContentSize.Y)
 
         lastDetected = "---"
         forceUpdateList = true
     end
-
-    WBSearchBtn.MouseButton1Click:Connect(SearchWords)
-    WBEndBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
-    WBLengthBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
-
-    WordBrowserBtn.MouseButton1Click:Connect(function()
-        WordBrowserFrame.Visible = not WordBrowserFrame.Visible
-        WordBrowserFrame.Parent = nil
-        WordBrowserFrame.Parent = ScreenGui
-    end)
-end
 
 local function CalculateDelay()
     local charsPerMin = currentCPM
