@@ -45,7 +45,7 @@ local Config = {
     Blatant = false,
     Humanize = true,
     FingerModel = true,
-    SortMode = "Random",
+    SortMode = "Shortest",
     SuffixMode = "",
     LengthMode = 0,
     AutoPlay = false,
@@ -1000,13 +1000,15 @@ end)
 KeyboardBtn.TextColor3 = showKeyboard and THEME.Success or Color3.fromRGB(255, 100, 100)
 
 local SortBtn = CreateToggle("Sort: "..sortMode, UDim2.new(0, 15, 0, 33), function()
-    if sortMode == "Random" then sortMode = "Shortest"
-    elseif sortMode == "Shortest" then sortMode = "Longest"
-    elseif sortMode == "Longest" then sortMode = "Killer"
-    else sortMode = "Random" end
+    if sortMode == "Shortest" then 
+        sortMode = "Random"
+    else 
+        sortMode = "Shortest"
+    end
     
     Config.SortMode = sortMode
     lastDetected = "---"
+    forceUpdateList = true
     return true, "Sort: "..sortMode, THEME.Accent
 end)
 SortBtn.TextColor3 = THEME.Accent
@@ -2640,38 +2642,22 @@ end
     end
     
     if #matches > 0 then
-        -- >>> FIX: Sort filtered and padding separately to keep filtered on top <
-        local filteredCount = 0
-        for _, w in ipairs(matches) do
-            local function checkSuffix(w)
-                if suffixMode == "" then return true end
-                local suffixList = Config.SuffixModes
-                if suffixList and #suffixList > 1 then
-                    for _, s in ipairs(suffixList) do
-                        if w:sub(-#s) == s then return true end
-                    end
-                    return false
-                end
-                return w:sub(-#suffixMode) == suffixMode
-            end
-            local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
-            if isFiltered then filteredCount = filteredCount + 1 end
-        end
-
         local filtered = {}
         local padding = {}
-        for _, w in ipairs(matches) do
-            local function checkSuffix(w)
-                if suffixMode == "" then return true end
-                local suffixList = Config.SuffixModes
-                if suffixList and #suffixList > 1 then
-                    for _, s in ipairs(suffixList) do
-                        if w:sub(-#s) == s then return true end
-                    end
-                    return false
+
+        local function checkSuffix(w)
+            if suffixMode == "" then return true end
+            local suffixList = Config.SuffixModes
+            if suffixList and #suffixList > 1 then
+                for _, s in ipairs(suffixList) do
+                    if w:sub(-#s) == s then return true end
                 end
-                return w:sub(-#suffixMode) == suffixMode
+                return false
             end
+            return w:sub(-#suffixMode) == suffixMode
+        end
+
+        for _, w in ipairs(matches) do
             local isFiltered = checkSuffix(w) and (lengthMode == 0 or #w == lengthMode)
             if isFiltered then
                 table.insert(filtered, w)
@@ -2680,25 +2666,38 @@ end
             end
         end
 
-        local function sortGroup(t, forceShort)
-            if forceShort or (suffixMode ~= "" and sortMode == "Random") then
-                table.sort(t, function(a, b) return #a < #b end)
-            elseif sortMode == "Longest" then
-                table.sort(t, function(a, b) return #a > #b end)
-            elseif sortMode == "Shortest" or sortMode == "Random" then
-                table.sort(t, function(a, b) return #a < #b end)
-            elseif sortMode == "Killer" then
+        local function ApplySort(t, mode)
+            if mode == "Shortest" then
                 table.sort(t, function(a, b)
-                    local sA = GetKillerScore(a)
-                    local sB = GetKillerScore(b)
-                    if sA == sB then return #a < #b end
-                    return sA > sB
+                    if #a ~= #b then return #a < #b end
+                    return a < b
                 end)
+            else
+                local byLength = {}
+                for _, word in ipairs(t) do
+                    local len = #word
+                    if not byLength[len] then byLength[len] = {} end
+                    table.insert(byLength[len], word)
+                end
+                for _, group in pairs(byLength) do
+                    for i = #group, 2, -1 do
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
+                    end
+                end
+                for i = #t, 1, -1 do t[i] = nil end
+                for len = 1, 50 do
+                    if byLength[len] then
+                        for _, word in ipairs(byLength[len]) do
+                            table.insert(t, word)
+                        end
+                    end
+                end
             end
         end
 
-        sortGroup(filtered, true)
-        sortGroup(padding, true)
+        ApplySort(filtered, sortMode)
+        ApplySort(padding, sortMode)
 
         matches = {}
         for _, w in ipairs(filtered) do table.insert(matches, w) end
