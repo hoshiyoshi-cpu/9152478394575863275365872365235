@@ -2673,7 +2673,6 @@ end
                     return a < b
                 end)
             else
-                -- Random mode: shortest first, shuffled within same length
                 local byLength = {}
                 for _, word in ipairs(t) do
                     local len = #word
@@ -2686,16 +2685,14 @@ end
                         group[i], group[j] = group[j], group[i]
                     end
                 end
-                local result = {}
+                for i = #t, 1, -1 do t[i] = nil end
                 for len = 1, 50 do
                     if byLength[len] then
                         for _, word in ipairs(byLength[len]) do
-                            table.insert(result, word)
+                            table.insert(t, word)
                         end
                     end
                 end
-                for i = #t, 1, -1 do t[i] = nil end
-                for _, word in ipairs(result) do table.insert(t, word) end
             end
         end
 
