@@ -66,6 +66,8 @@ local Config = {
     KeyboardLayout = "QWERTY"
 }
 
+local lastUpdateListTime = 0
+
 local function SaveConfig()
     if writefile then
         writefile(ConfigFile, HttpService:JSONEncode(Config))
@@ -254,6 +256,11 @@ for _, w in ipairs(Words) do
     if c == "" then c = "#" end
     Buckets[c] = Buckets[c] or {}
     table.insert(Buckets[c], w)
+end
+
+local WordCache = {}
+for letter, bucket in pairs(Buckets) do
+    WordCache[letter] = bucket
 end
 
 if Config.CustomWords then
@@ -2432,7 +2439,16 @@ local function BinarySearchStart(list, prefix)
     return result
 end
 
+local lastUpdateTime = 0
+local UPDATE_THROTTLE = 0.05
+
 UpdateList = function(detectedText, requiredLetter)
+    local now = tick()
+    if now - lastUpdateTime < UPDATE_THROTTLE and not forceUpdateList then
+        return
+    end
+    lastUpdateTime = now
+
     local hash = (detectedText or "") .. "|" .. (requiredLetter or "") .. "|" .. (SearchBox.Text or "") .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
     if hash == lastUpdateHash and not forceUpdateList then return end
     lastUpdateHash = hash
