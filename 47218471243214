@@ -273,19 +273,6 @@ end
 -- Clear memory
 SeenWords = nil
 
-local function IsValidWord(str)
-    if #str < 2 then return false end
-    local firstChar = str:sub(1,1)
-    if Buckets and Buckets[firstChar] then
-        for _, w in ipairs(Buckets[firstChar]) do
-            if w == str then
-                return true
-            end
-        end
-    end
-    return false
-end
-
 local function shuffleTable(t)
     local n = #t
     for i = n, 2, -1 do
@@ -2678,77 +2665,43 @@ end
                 table.insert(padding, w)
             end
         end
-        function ApplySort(t, mode, detectedText, requiredLetter)
+        function ApplySort(t, mode)
             if mode == "Shortest" then
                 table.sort(t, function(a, b)
                     if #a ~= #b then return #a < #b end
                     return a < b
                 end)
             else
-                -- Random mode with priority: non-word prefixes > word prefixes
-                -- A "prefix" is the part of the word that's already typed (detectedText)
-                -- OR if we're backtracking, it's the required letter
-                
-                local prefixToCheck = detectedText or ""
-                if prefixToCheck == "" and requiredLetter then
-                    prefixToCheck = requiredLetter
+                -- Random mode with length grouping (2-3 letter spread)
+                -- Group words by length ranges
+                local ranges = {}
+        
+                for _, word in ipairs(t) do
+                    local len = #word
+                    -- Group into buckets of 3: 1-3, 4-6, 7-9, 10-12, etc.
+                    local bucket = math.floor((len - 1) / 3)
+                    if not ranges[bucket] then ranges[bucket] = {} end
+                    table.insert(ranges[bucket], word)
                 end
-                
-                -- Calculate priority score for each word
-                -- Lower score = appears earlier in list
-                local function GetPriority(word)
-                    -- If we have a detected prefix, check if that exact prefix is a valid word
-                    if prefixToCheck ~= "" and #prefixToCheck >= 2 then
-                        local isPrefixAWord = IsValidWord(prefixToCheck)
-                        
-                        -- Check if the word starts with this prefix
-                        if word:sub(1, #prefixToCheck) == prefixToCheck then
-                            -- If the prefix itself IS a word, this word should be LOWER priority
-                            -- (appear later), because you don't want to auto-solve
-                            if isPrefixAWord then
-                                return 1000 -- High number = low priority
-                            else
-                                return 0 -- Prefix not a word = high priority
-                            end
+        
+                -- Shuffle within each range
+                for _, group in pairs(ranges) do
+                    for i = #group, 2, -1 do
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
+                    end
+                end
+        
+                -- Flatten ranges in order (all 1-3 length words first, then 4-6, etc.)
+                local result = {}
+                for bucket = 0, 20 do
+                    if ranges[bucket] then
+                        for _, word in ipairs(ranges[bucket]) do
+                            table.insert(result, word)
                         end
                     end
-                    
-                    -- No prefix, or word doesn't start with prefix - normal priority
-                    return 500
                 end
-                
-                -- First, separate words by priority
-                local highPriority = {}  -- Prefix is NOT a word (e.g., "pego" in "pegology")
-                local lowPriority = {}   -- Prefix IS a word (e.g., "able" in "sable")
-                
-                for _, word in ipairs(t) do
-                    if GetPriority(word) == 0 then
-                        table.insert(highPriority, word)
-                    else
-                        table.insert(lowPriority, word)
-                    end
-                end
-                
-                -- Shuffle each group randomly
-                for i = #highPriority, 2, -1 do
-                    local j = math.random(i)
-                    highPriority[i], highPriority[j] = highPriority[j], highPriority[i]
-                end
-                
-                for i = #lowPriority, 2, -1 do
-                    local j = math.random(i)
-                    lowPriority[i], lowPriority[j] = lowPriority[j], lowPriority[i]
-                end
-                
-                -- Combine: high priority FIRST, low priority LAST
-                local result = {}
-                for _, word in ipairs(highPriority) do
-                    table.insert(result, word)
-                end
-                for _, word in ipairs(lowPriority) do
-                    table.insert(result, word)
-                end
-                
+        
                 -- Replace original table
                 for i = #t, 1, -1 do t[i] = nil end
                 for i, word in ipairs(result) do
@@ -2757,8 +2710,8 @@ end
             end
         end
 
-        ApplySort(filtered, sortMode, searchPrefix, requiredLetter)
-        ApplySort(padding, sortMode, searchPrefix, requiredLetter)
+        ApplySort(filtered, sortMode)
+        ApplySort(padding, sortMode)
 
         matches = {}
         for _, w in ipairs(filtered) do table.insert(matches, w) end
