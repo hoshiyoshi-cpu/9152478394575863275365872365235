@@ -314,31 +314,6 @@ local function getDistance(s1, s2)
     return matrix[#s1][#s2]
 end
 
--- Add this function
-local function IsValidWord(word)
-    -- Check if word exists in the main dictionary
-    local c = word:sub(1,1)
-    if c == "" then return false end
-    
-    local bucket = Buckets[c]
-    if not bucket then return false end
-    
-    -- Binary search for exact match
-    local left, right = 1, #bucket
-    while left <= right do
-        local mid = math.floor((left + right) / 2)
-        local testWord = bucket[mid]
-        if testWord == word then
-            return true
-        elseif testWord < word then
-            left = mid + 1
-        else
-            right = mid - 1
-        end
-    end
-    return false
-end
-
 local function Tween(obj, props, time)
     TweenService:Create(obj, TweenInfo.new(time or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
@@ -2690,91 +2665,53 @@ end
                 table.insert(padding, w)
             end
         end
-        function ApplySort(t, mode, requiredLetter)
+        function ApplySort(t, mode)
             if mode == "Shortest" then
                 table.sort(t, function(a, b)
                     if #a ~= #b then return #a < #b end
                     return a < b
                 end)
             else
-                -- Get the game prefix letter for the exception rule
-                local gamePrefix = ""
-                if requiredLetter and #requiredLetter > 0 then
-                    gamePrefix = requiredLetter:sub(1,1):lower()
-                end
-
-                -- Check if a word should be deprioritized because its matching suffix is a standalone word
-                local function IsSelfSolveSuffix(word)
-                    if suffixMode == "" then return false end
-                    local suffixList = Config.SuffixModes
-                    local suffixes = (suffixList and #suffixList > 0) and suffixList or {suffixMode}
-                    for _, s in ipairs(suffixes) do
-                        s = s:lower()
-                        -- Skip deprioritization if suffix starts with the game prefix letter
-                        -- e.g. game says "A", suffix "able" starts with A -> don't deprioritize
-                        if s:sub(1,1) ~= gamePrefix and word:sub(-#s) == s and IsValidWord(s) then
-                            return true
-                        end
-                    end
-                    return false
-                end
-
-                -- Separate into self-solve suffixed words and normal words
-                local normal = {}
-                local selfSolve = {}
+                -- Random mode with length grouping (2-3 letter spread)
+                -- Group words by length ranges
+                local ranges = {}
+        
                 for _, word in ipairs(t) do
-                    if IsSelfSolveSuffix(word) then
-                        table.insert(selfSolve, word)
-                    else
-                        table.insert(normal, word)
+                    local len = #word
+                    -- Group into buckets of 3: 1-3, 4-6, 7-9, 10-12, etc.
+                    local bucket = math.floor((len - 1) / 3)
+                    if not ranges[bucket] then ranges[bucket] = {} end
+                    table.insert(ranges[bucket], word)
+                end
+        
+                -- Shuffle within each range
+                for _, group in pairs(ranges) do
+                    for i = #group, 2, -1 do
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
                     end
                 end
-
-                -- Within each group, apply length-range shuffling (buckets of 3)
-                local function ShuffleByLengthRanges(group)
-                    local ranges = {}
-
-                    for _, word in ipairs(group) do
-                        local len = #word
-                        -- Group into buckets of 3: 1-3, 4-6, 7-9, 10-12, etc.
-                        local bucket = math.floor((len - 1) / 3)
-                        if not ranges[bucket] then ranges[bucket] = {} end
-                        table.insert(ranges[bucket], word)
-                    end
-
-                    -- Shuffle within each range
-                    for _, rangeGroup in pairs(ranges) do
-                        for i = #rangeGroup, 2, -1 do
-                            local j = math.random(i)
-                            rangeGroup[i], rangeGroup[j] = rangeGroup[j], rangeGroup[i]
+        
+                -- Flatten ranges in order (all 1-3 length words first, then 4-6, etc.)
+                local result = {}
+                for bucket = 0, 20 do
+                    if ranges[bucket] then
+                        for _, word in ipairs(ranges[bucket]) do
+                            table.insert(result, word)
                         end
                     end
-
-                    -- Flatten ranges in order (all 1-3 length words first, then 4-6, etc.)
-                    local result = {}
-                    for bucket = 0, 20 do
-                        if ranges[bucket] then
-                            for _, word in ipairs(ranges[bucket]) do
-                                table.insert(result, word)
-                            end
-                        end
-                    end
-
-                    return result
                 end
-
-                local sortedNormal    = ShuffleByLengthRanges(normal)
-                local sortedSelfSolve = ShuffleByLengthRanges(selfSolve)
-
-                -- Normal words first, self-solve suffixed words last
+        
+                -- Replace original table
                 for i = #t, 1, -1 do t[i] = nil end
-                for i, word in ipairs(sortedNormal)    do t[i] = word end
-                for i, word in ipairs(sortedSelfSolve) do t[#sortedNormal + i] = word end
+                for i, word in ipairs(result) do
+                    t[i] = word
+                end
             end
         end
 
-        ApplySort(filtered, sortMode, requiredLetter)
-        ApplySort(padding, sortMode, requiredLetter)
+        ApplySort(filtered, sortMode)
+        ApplySort(padding, sortMode)
 
         matches = {}
         for _, w in ipairs(filtered) do table.insert(matches, w) end
