@@ -1688,7 +1688,7 @@ local function FetchServers()
                             ShowToast("Teleporting...", "success")
                             
                             if queue_on_teleport then
-                                queue_on_teleport('https://raw.githubusercontent.com/hoshiyoshi-cpu/915247839457/refs/heads/main/47218471243214"))()')
+                                queue_on_teleport('https://raw.githubusercontent.com/hoshiyoshi-cpu/9152478394575863275365872365235/refs/heads/main/47218471243214"))()')
                             end
 
                             task.spawn(function()
