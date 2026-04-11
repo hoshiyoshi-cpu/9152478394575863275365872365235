@@ -1115,6 +1115,7 @@ Instance.new("UICorner", ResetUsedBtn).CornerRadius = UDim.new(0, 4)
 
 ResetUsedBtn.MouseButton1Click:Connect(function()
     UsedWords = {}
+    wordCache = {}
     lastManualInput = ""
     forceUpdateList = true
     StatusText.Text = "Used Words Reset"
@@ -2432,10 +2433,37 @@ local function BinarySearchStart(list, prefix)
     return result
 end
 
+local wordCache = {}
+local wordCacheHash = ""
+
 UpdateList = function(detectedText, requiredLetter)
     local hash = (detectedText or "") .. "|" .. (requiredLetter or "") .. "|" .. (SearchBox.Text or "") .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
     if hash == lastUpdateHash and not forceUpdateList then return end
     lastUpdateHash = hash
+
+    if wordCache[hash] and not forceUpdateList then
+        local displayList = wordCache[hash]
+        -- jump straight to button rendering with cached list
+        for i = 1, math.max(#displayList, #ButtonCache) do
+            local w = displayList[i]
+            local btn = ButtonCache[i]
+            if w then
+                if btn then
+                    btn.Visible = true
+                    ButtonData[btn] = {word = w, detected = detectedText}
+                    local lbl = btn:FindFirstChild("Label")
+                    if lbl then lbl.Text = w end
+                end
+            else
+                if btn then
+                    btn.Visible = false
+                    ButtonData[btn] = nil
+                end
+            end
+        end
+        ScrollList.CanvasSize = UDim2.new(0,0,0, UIListLayout.AbsoluteContentSize.Y)
+        return
+    end
 
     local matches = {}
     local searchPrefix = detectedText
@@ -2788,6 +2816,13 @@ end
     local displayList = {}
     local maxDisplay = 15
     for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
+
+    wordCache[hash] = displayList
+    local cacheSize = 0
+    for _ in pairs(wordCache) do cacheSize = cacheSize + 1 end
+    if cacheSize > 50 then
+        wordCache = {}
+    end
     
     if showKeyboard and KeyboardFrame.Visible then
         local colors = {
@@ -3144,6 +3179,7 @@ runConn = RunService.Heartbeat:Connect(function()
         local typeVisible = typeLbl and typeLbl.Visible
         if typeVisible and not lastTypeVisible then
             UsedWords = {}
+            wordCache = {}
             StatusText.Text = "New Round - Words Reset"
             StatusText.TextColor3 = THEME.Success
         end
