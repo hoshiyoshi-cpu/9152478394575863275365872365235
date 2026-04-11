@@ -1115,7 +1115,6 @@ Instance.new("UICorner", ResetUsedBtn).CornerRadius = UDim.new(0, 4)
 
 ResetUsedBtn.MouseButton1Click:Connect(function()
     UsedWords = {}
-    wordCache = {}
     lastManualInput = ""
     forceUpdateList = true
     StatusText.Text = "Used Words Reset"
@@ -1688,7 +1687,7 @@ local function FetchServers()
                             ShowToast("Teleporting...", "success")
                             
                             if queue_on_teleport then
-                                queue_on_teleport('https://raw.githubusercontent.com/hoshiyoshi-cpu/9152478394575863275365872365235/refs/heads/main/47218471243214"))()')
+                                queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/skrylor/Last-Letter-Script/refs/heads/main/Last%20Letter.lua"))()')
                             end
 
                             task.spawn(function()
@@ -2433,42 +2432,10 @@ local function BinarySearchStart(list, prefix)
     return result
 end
 
-local wordCache = {}
-local wordCacheHash = ""
-
 UpdateList = function(detectedText, requiredLetter)
     local hash = (detectedText or "") .. "|" .. (requiredLetter or "") .. "|" .. (SearchBox.Text or "") .. "|" .. suffixMode .. "|" .. tostring(lengthMode)
     if hash == lastUpdateHash and not forceUpdateList then return end
     lastUpdateHash = hash
-
-    if wordCache[hash] and not forceUpdateList and #ButtonCache > 0 then
-        local displayList = wordCache[hash]
-        for i = 1, math.max(#displayList, #ButtonCache) do
-            local w = displayList[i]
-            local btn = ButtonCache[i]
-            -- validate button still exists and is parented
-            if btn and not btn.Parent then
-                wordCache = {}
-                break
-            end
-            if w then
-                if btn then
-                    btn.Visible = true
-                    btn.Parent = ScrollList
-                    ButtonData[btn] = {word = w, detected = detectedText}
-                    local lbl = btn:FindFirstChild("Label")
-                    if lbl then lbl.Text = w end
-                end
-            else
-                if btn then
-                    btn.Visible = false
-                    ButtonData[btn] = nil
-                end
-            end
-        end
-        ScrollList.CanvasSize = UDim2.new(0,0,0, UIListLayout.AbsoluteContentSize.Y)
-        return
-    end
 
     local matches = {}
     local searchPrefix = detectedText
@@ -2821,13 +2788,6 @@ end
     local displayList = {}
     local maxDisplay = 15
     for i = 1, math.min(maxDisplay, #matches) do table.insert(displayList, matches[i]) end
-
-    wordCache[hash] = displayList
-    local cacheSize = 0
-    for _ in pairs(wordCache) do cacheSize = cacheSize + 1 end
-    if cacheSize > 50 then
-        wordCache = {}
-    end
     
     if showKeyboard and KeyboardFrame.Visible then
         local colors = {
@@ -3184,7 +3144,6 @@ runConn = RunService.Heartbeat:Connect(function()
         local typeVisible = typeLbl and typeLbl.Visible
         if typeVisible and not lastTypeVisible then
             UsedWords = {}
-            wordCache = {}
             StatusText.Text = "New Round - Words Reset"
             StatusText.TextColor3 = THEME.Success
         end
