@@ -2666,12 +2666,18 @@ end
             end
         end
         function ApplySort(t, mode)
+            local suffixPriorityCache = {}
+            local suffixLengths = {}
+            if Config.SuffixModes then
+                for i, s in ipairs(Config.SuffixModes) do
+                    suffixPriorityCache[s] = i
+                    suffixLengths[#s] = true
+                end
+            end
+
             local function getSuffixPriority(word)
                 if not Config.SuffixModes or #Config.SuffixModes == 0 then return 999 end
 
-                -- If any suffix in the list starts with the same letter as the
-                -- current required prefix, that suffix gets bumped to #1
-                -- UNLESS a word using that suffix was already used this round
                 local boostedSuffix = nil
                 if lastRequiredLetter and #lastRequiredLetter > 0 then
                     local reqChar = lastRequiredLetter:sub(1,1):lower()
@@ -2692,16 +2698,22 @@ end
                     end
                 end
 
-                -- Check boosted suffix first
                 if boostedSuffix and word:sub(-#boostedSuffix) == boostedSuffix then
                     return 0
                 end
 
-                -- Fall back to normal suffix priority order
-                for i, s in ipairs(Config.SuffixModes) do
-                    if word:sub(-#s) == s then return i end
+                -- Only check suffix lengths that actually exist in your list
+                local best = 999
+                for len, _ in pairs(suffixLengths) do
+                    if #word >= len then
+                        local suffix = word:sub(-len)
+                        local p = suffixPriorityCache[suffix]
+                        if p and p < best then
+                            best = p
+                        end
+                    end
                 end
-                return 999
+                return best
             end
 
             if mode == "Shortest" then
@@ -2725,8 +2737,7 @@ end
                 local function applyLengthShuffle(group)
                     local ranges = {}
                     for _, word in ipairs(group) do
-                        local len = #word
-                        local bucket = math.floor((len - 1) / 3)
+                        local bucket = math.floor((#word - 1) / 3)
                         if not ranges[bucket] then ranges[bucket] = {} end
                         table.insert(ranges[bucket], word)
                     end
