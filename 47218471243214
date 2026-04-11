@@ -2441,15 +2441,20 @@ UpdateList = function(detectedText, requiredLetter)
     if hash == lastUpdateHash and not forceUpdateList then return end
     lastUpdateHash = hash
 
-    if wordCache[hash] and not forceUpdateList then
+    if wordCache[hash] and not forceUpdateList and #ButtonCache > 0 then
         local displayList = wordCache[hash]
-        -- jump straight to button rendering with cached list
         for i = 1, math.max(#displayList, #ButtonCache) do
             local w = displayList[i]
             local btn = ButtonCache[i]
+            -- validate button still exists and is parented
+            if btn and not btn.Parent then
+                wordCache = {}
+                break
+            end
             if w then
                 if btn then
                     btn.Visible = true
+                    btn.Parent = ScrollList
                     ButtonData[btn] = {word = w, detected = detectedText}
                     local lbl = btn:FindFirstChild("Label")
                     if lbl then lbl.Text = w end
