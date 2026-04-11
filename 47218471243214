@@ -2668,6 +2668,36 @@ end
         function ApplySort(t, mode)
             local function getSuffixPriority(word)
                 if not Config.SuffixModes or #Config.SuffixModes == 0 then return 999 end
+
+                -- If any suffix in the list starts with the same letter as the
+                -- current required prefix, that suffix gets bumped to #1
+                -- UNLESS a word using that suffix was already used this round
+                local boostedSuffix = nil
+                if lastRequiredLetter and #lastRequiredLetter > 0 then
+                    local reqChar = lastRequiredLetter:sub(1,1):lower()
+                    for _, s in ipairs(Config.SuffixModes) do
+                        if s:sub(1,1):lower() == reqChar then
+                            local suffixWasUsed = false
+                            for usedWord, _ in pairs(UsedWords) do
+                                if usedWord:sub(-#s) == s then
+                                    suffixWasUsed = true
+                                    break
+                                end
+                            end
+                            if not suffixWasUsed then
+                                boostedSuffix = s
+                            end
+                            break
+                        end
+                    end
+                end
+
+                -- Check boosted suffix first
+                if boostedSuffix and word:sub(-#boostedSuffix) == boostedSuffix then
+                    return 0
+                end
+
+                -- Fall back to normal suffix priority order
                 for i, s in ipairs(Config.SuffixModes) do
                     if word:sub(-#s) == s then return i end
                 end
@@ -2686,13 +2716,11 @@ end
                 -- Random mode with suffix priority, then length grouping (2-3 letter spread)
                 -- Group words by suffix priority first, then length ranges
                 local groups = {}
-
                 for _, word in ipairs(t) do
                     local p = getSuffixPriority(word)
                     if not groups[p] then groups[p] = {} end
                     table.insert(groups[p], word)
                 end
-
                 -- Shuffle within each suffix group
                 for _, group in pairs(groups) do
                     for i = #group, 2, -1 do
@@ -2700,7 +2728,6 @@ end
                         group[i], group[j] = group[j], group[i]
                     end
                 end
-
                 -- Flatten in suffix priority order
                 local result = {}
                 local keys = {}
@@ -2711,7 +2738,6 @@ end
                         table.insert(result, word)
                     end
                 end
-
                 -- Replace original table
                 for i = #t, 1, -1 do t[i] = nil end
                 for i, word in ipairs(result) do
