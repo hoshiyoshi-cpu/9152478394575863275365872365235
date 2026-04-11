@@ -159,7 +159,7 @@ logConn = LogService.MessageOut:Connect(function(message, type)
     end
 end)
 
-local url = "https://raw.githubusercontent.com/hoshiyoshi-cpu/915247839457/refs/heads/main/yinglish"
+local url = "https://raw.githubusercontent.com/inesbotv1/inesbot/refs/heads/main/lastletter.txt"
 local fileName = "yinglish.txt"
 
 -- Temporary Loading UI
