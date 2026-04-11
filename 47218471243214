@@ -2559,10 +2559,6 @@ UpdateList = function(detectedText, requiredLetter)
                     if #exacts >= searchLimit then break end
                 end
             end
-            
-            if sortMode == "Random" and #exacts > 0 then
-                shuffleTable(exacts)
-            end
         end
         return exacts, partials, maxPartialLen
     end
@@ -2735,27 +2731,11 @@ end
 
                 -- Within each priority group, apply length bucketing + shuffle
                 local function applyLengthShuffle(group)
-                    local ranges = {}
-                    for _, word in ipairs(group) do
-                        local bucket = math.floor((#word - 1) / 3)
-                        if not ranges[bucket] then ranges[bucket] = {} end
-                        table.insert(ranges[bucket], word)
+                    for i = #group, 2, -1 do
+                        local j = math.random(i)
+                        group[i], group[j] = group[j], group[i]
                     end
-                    for _, rangeGroup in pairs(ranges) do
-                        for i = #rangeGroup, 2, -1 do
-                            local j = math.random(i)
-                            rangeGroup[i], rangeGroup[j] = rangeGroup[j], rangeGroup[i]
-                        end
-                    end
-                    local result = {}
-                    for bucket = 0, 20 do
-                        if ranges[bucket] then
-                            for _, word in ipairs(ranges[bucket]) do
-                                table.insert(result, word)
-                            end
-                        end
-                    end
-                    return result
+                    return group
                 end
 
                 -- Flatten priority groups in order, each group length-shuffled
