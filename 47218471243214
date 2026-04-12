@@ -249,19 +249,11 @@ if LoadingGui then LoadingGui:Destroy() end
 
 table.sort(Words)
 Buckets = {}
-Buckets2 = {}
 for _, w in ipairs(Words) do
     local c = w:sub(1,1) or ""
     if c == "" then c = "#" end
     Buckets[c] = Buckets[c] or {}
     table.insert(Buckets[c], w)
-
-    if #w >= 2 then
-        local p2 = w:sub(1,2)
-        Buckets2[c] = Buckets2[c] or {}
-        Buckets2[c][p2] = Buckets2[c][p2] or {}
-        table.insert(Buckets2[c][p2], w)
-    end
 end
 
 if Config.CustomWords then
@@ -274,87 +266,12 @@ if Config.CustomWords then
             if c == "" then c = "#" end
             Buckets[c] = Buckets[c] or {}
             table.insert(Buckets[c], clean)
-
-            if #clean >= 2 then
-                local p2 = clean:sub(1,2)
-                Buckets2[c] = Buckets2[c] or {}
-                Buckets2[c][p2] = Buckets2[c][p2] or {}
-                table.insert(Buckets2[c][p2], clean)
-            end
         end
     end
 end
 
 -- Clear memory
 SeenWords = nil
-
-local PrefixSearchCache = {
-    bucket = nil,
-    prefix = "",
-    start = 1,
-    finish = 0
-}
-
-local function BinarySearchStartInRange(list, prefix, left, right)
-    local result = -1
-    while left <= right do
-        local mid = math.floor((left + right) / 2)
-        local word = list[mid]
-        local sub = word:sub(1, #prefix)
-        if sub == prefix then
-            result = mid
-            right = mid - 1
-        elseif sub < prefix then
-            left = mid + 1
-        else
-            right = mid - 1
-        end
-    end
-    return result
-end
-
-local function BinarySearchEndInRange(list, prefix, left, right)
-    local result = -1
-    while left <= right do
-        local mid = math.floor((left + right) / 2)
-        local word = list[mid]
-        local sub = word:sub(1, #prefix)
-        if sub == prefix then
-            result = mid
-            left = mid + 1
-        elseif sub < prefix then
-            left = mid + 1
-        else
-            right = mid - 1
-        end
-    end
-    return result
-end
-
-local function GetPrefixRange(bucket, prefix)
-    if not bucket or #bucket == 0 or #prefix == 0 then
-        return 1, #bucket
-    end
-
-    local left, right = 1, #bucket
-    if PrefixSearchCache.bucket == bucket and prefix:sub(1, #PrefixSearchCache.prefix) == PrefixSearchCache.prefix then
-        left = PrefixSearchCache.start
-        right = PrefixSearchCache.finish
-    end
-
-    local startIndex = BinarySearchStartInRange(bucket, prefix, left, right)
-    if startIndex == -1 then
-        PrefixSearchCache = {bucket = bucket, prefix = prefix, start = 1, finish = 0}
-        return -1, -1
-    end
-
-    local endIndex = BinarySearchEndInRange(bucket, prefix, startIndex, right)
-    PrefixSearchCache.bucket = bucket
-    PrefixSearchCache.prefix = prefix
-    PrefixSearchCache.start = startIndex
-    PrefixSearchCache.finish = endIndex
-    return startIndex, endIndex
-end
 
 local function shuffleTable(t)
     local n = #t
@@ -703,8 +620,7 @@ SearchBox.TextXAlignment = Enum.TextXAlignment.Left
 
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     if UpdateList then
-        listUpdatePending = true
-        lastInputTime = tick()
+        UpdateList(lastDetected, lastRequiredLetter)
     end
 end)
 
@@ -2540,15 +2456,6 @@ UpdateList = function(detectedText, requiredLetter)
              searchPrefix = requiredLetter
         end
     end
-
-    if searchPrefix == "" and not requiredLetter then
-        for _, btn in ipairs(ButtonCache) do
-            if btn then btn.Visible = false end
-        end
-        currentBestMatch = nil
-        ScrollList.CanvasSize = UDim2.new(0,0,0, UIListLayout.AbsoluteContentSize.Y)
-        return
-    end
     
     local firstChar = searchPrefix:sub(1,1)
     if firstChar == "#" then firstChar = nil end
@@ -2559,11 +2466,7 @@ UpdateList = function(detectedText, requiredLetter)
     
     local bucket
     if firstChar and firstChar ~= "" and Buckets then
-        if #searchPrefix >= 2 and Buckets2 and Buckets2[firstChar] then
-            bucket = Buckets2[firstChar][searchPrefix:sub(1,2)] or Buckets[firstChar] or {}
-        else
-            bucket = Buckets[firstChar] or {}
-        end
+        bucket = Buckets[firstChar] or {}
     else
         bucket = Words
     end
@@ -2623,17 +2526,30 @@ UpdateList = function(detectedText, requiredLetter)
             if prefix:find("#") or prefix:find("%*") then useBinary = false end
             
             if useBinary and #prefix > 0 then
-                local startIndex, endIndex = GetPrefixRange(bucket, prefix)
+                local startIndex = BinarySearchStart(bucket, prefix)
                 
-                if startIndex ~= -1 and endIndex >= startIndex then
+                if startIndex ~= -1 then
                     local count = 0
-                    local scanLimit = (#prefix >= 2) and 0 or 2000
-                    for i = startIndex, endIndex do
+                    for i = startIndex, #bucket do
                         local w = bucket[i]
+                        
+                        if w:sub(1, #prefix) ~= prefix then break end
+                        
                         checkWord(w)
                         
                         count = count + 1
-                        if scanLimit > 0 and count >= scanLimit then break end
+
+                        local hardLimit = 800
+                        local exactLimit = 500
+
+                        if suffixMode ~= "" or lengthMode > 0 then
+                            hardLimit = 3800
+                            exactLimit = 500
+                        end
+
+                        if #exacts >= exactLimit then break end
+                        if count >= hardLimit then break end
+
                     end
                 end
             else
@@ -2876,9 +2792,10 @@ end
         for char, k in pairs(Keys) do
             local priority = targetKeys[char]
             if priority then
-                k.BackgroundColor3 = colors[priority]
+                k.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Tween(k, {BackgroundColor3 = colors[priority]}, 0.3)
             else
-                k.BackgroundColor3 = THEME.ItemBG
+                Tween(k, {BackgroundColor3 = THEME.ItemBG}, 0.2)
             end
         end
     end
