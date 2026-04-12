@@ -999,12 +999,9 @@ local KeyboardBtn = CreateToggle("Keyboard: "..(showKeyboard and "ON" or "OFF"),
 end)
 KeyboardBtn.TextColor3 = showKeyboard and THEME.Success or Color3.fromRGB(255, 100, 100)
 
--- Replace the SortBtn CreateToggle callback:
 local SortBtn = CreateToggle("Sort: "..sortMode, UDim2.new(0, 15, 0, 33), function()
     if sortMode == "Shortest" then 
         sortMode = "Random"
-    elseif sortMode == "Random" then
-        sortMode = "Pro"
     else 
         sortMode = "Shortest"
     end
@@ -1012,11 +1009,7 @@ local SortBtn = CreateToggle("Sort: "..sortMode, UDim2.new(0, 15, 0, 33), functi
     Config.SortMode = sortMode
     lastDetected = "---"
     forceUpdateList = true
-    
-    local color = THEME.Accent
-    if sortMode == "Pro" then color = Color3.fromRGB(255, 80, 200) end
-    
-    return true, "Sort: "..sortMode, color
+    return true, "Sort: "..sortMode, THEME.Accent
 end)
 SortBtn.TextColor3 = THEME.Accent
 SortBtn.Size = UDim2.new(0, 130, 0, 24)
@@ -2718,61 +2711,6 @@ end
                 end
                 return best
             end
-
-            elseif mode == "Pro" then
-                local function getProScore(word)
-                    local bestScore = 0
-
-                    for len = math.min(4, #word), 1, -1 do
-                        local endPrefix = word:sub(-len):lower()
-                        if #endPrefix >= 1 then
-                            local firstChar = endPrefix:sub(1,1)
-                            local bucket = Buckets[firstChar] or {}
-
-                            local matchingWords = {}
-                            local nextLetters = {}
-
-                            for _, w in ipairs(bucket) do
-                                if w:sub(1, #endPrefix) == endPrefix and #w > #endPrefix then
-                                    if not Blacklist[w] and not UsedWords[w] then
-                                        table.insert(matchingWords, w)
-                                        local nextChar = w:sub(#endPrefix + 1, #endPrefix + 1)
-                                        nextLetters[nextChar] = true
-                                    end
-                                end
-                            end
-
-                            local uniqueNext = 0
-                            for _ in pairs(nextLetters) do uniqueNext = uniqueNext + 1 end
-
-                            local selfIsWord = false
-                            for _, w in ipairs(matchingWords) do
-                                if w == endPrefix then selfIsWord = true break end
-                            end
-
-                            local required = selfIsWord and 2 or 3
-                            local isValid = uniqueNext >= required
-
-                            if isValid then
-                                local allLong = true
-                                local avgLen = 0
-                                for _, w in ipairs(matchingWords) do
-                                    avgLen = avgLen + #w
-                                    if #w < 8 then allLong = false end
-                                end
-                                avgLen = #matchingWords > 0 and (avgLen / #matchingWords) or 0
-
-                                local hardScore = (100 / math.max(1, #matchingWords)) + (allLong and 50 or 0) + avgLen
-                                if hardScore > bestScore then
-                                    bestScore = hardScore
-                                end
-                            end
-                        end
-                        break
-                    end
-
-                    return bestScore
-                end
 
             if mode == "Shortest" then
                 table.sort(t, function(a, b)
