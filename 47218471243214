@@ -901,6 +901,9 @@ Instance.new("UICorner", CWAddBtn).CornerRadius = UDim.new(0, 4)
 
 local SmartType -- forward declare
 
+local lastWordPoolKey = ""
+local cachedRandomWords = {}
+
 local RefreshCustomWords
 RefreshCustomWords = function()
     for _, c in ipairs(CWScroll:GetChildren()) do
@@ -1369,9 +1372,30 @@ end
 
 local function ApplySort(t, mode)
     local suffixList = Config.SuffixModes or {}
-
-    -- Group words by priority
-    local groups = {} -- groups[priority] = list of words
+    
+    -- Create a unique key for this word pool
+    local poolKey = ""
+    if mode == "Random" then
+        for _, w in ipairs(t) do
+            poolKey = poolKey .. w .. "|"
+        end
+        poolKey = poolKey .. suffixMode .. "|" .. tostring(lengthMode)
+        
+        -- If same pool as before, use cached order
+        if poolKey == lastWordPoolKey and cachedRandomWords[1] then
+            for i = #t, 1, -1 do t[i] = nil end
+            for i, w in ipairs(cachedRandomWords) do
+                t[i] = w
+            end
+            return
+        end
+        
+        -- New pool, clear cache and store new key
+        lastWordPoolKey = poolKey
+    end
+    
+    -- Rest of your existing grouping and sorting logic...
+    local groups = {}
     local priorityOrder = {}
 
     for _, w in ipairs(t) do
@@ -1383,7 +1407,6 @@ local function ApplySort(t, mode)
         table.insert(groups[p], w)
     end
 
-    -- Deduplicate and sort priority keys
     local seen = {}
     local cleanOrder = {}
     for _, p in ipairs(priorityOrder) do
@@ -1394,14 +1417,12 @@ local function ApplySort(t, mode)
     end
     table.sort(cleanOrder)
 
-    -- Process each group according to mode
     local result = {}
 
     for _, p in ipairs(cleanOrder) do
         local group = groups[p]
 
         if mode == "Shortest" then
-            -- Sort by length ASC, then alpha
             table.sort(group, function(a, b)
                 if #a ~= #b then return #a < #b end
                 return a < b
@@ -1409,23 +1430,22 @@ local function ApplySort(t, mode)
             for _, w in ipairs(group) do
                 table.insert(result, w)
             end
-
         else
-            -- RANDOM mode:
-            -- First sort by length so we can chunk by length bands
+            -- RANDOM mode
+            -- First sort by length
             table.sort(group, function(a, b)
                 if #a ~= #b then return #a < #b end
                 return a < b
             end)
 
-            -- Chunk into groups of 3, shuffle each chunk
+            -- Chunk into groups of 3 and shuffle each chunk
             local i = 1
             while i <= #group do
                 local chunk = {}
                 for j = i, math.min(i + 2, #group) do
                     table.insert(chunk, group[j])
                 end
-                -- Fisher-Yates shuffle on this chunk of up to 3
+                -- Shuffle this chunk
                 for k = #chunk, 2, -1 do
                     local r = math.random(k)
                     chunk[k], chunk[r] = chunk[r], chunk[k]
@@ -1438,9 +1458,17 @@ local function ApplySort(t, mode)
         end
     end
 
-    -- Write back into t in-place
+    -- Write back into t
     for i = #t, 1, -1 do t[i] = nil end
     for i, w in ipairs(result) do t[i] = w end
+    
+    -- Cache the result for random mode
+    if mode == "Random" then
+        cachedRandomWords = {}
+        for i, w in ipairs(t) do
+            cachedRandomWords[i] = w
+        end
+    end
 end
 
 -- =============================================
