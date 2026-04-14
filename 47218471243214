@@ -522,13 +522,11 @@ TogglesFrame.BackgroundTransparency = 1
 
 local function UpdateLayout()
     if settingsCollapsed then
-        Tween(SettingsFrame, {Size = UDim2.new(1, 0, 0, 125), Position = UDim2.new(0, 0, 1, -125)})
-        Tween(ScrollList, {Size = UDim2.new(1, -10, 1, -245)})
-        TogglesFrame.Visible = false
+        Tween(SettingsFrame, {Size = UDim2.new(1, 0, 0, 60), Position = UDim2.new(0, 0, 1, -60)})
+        Tween(ScrollList, {Size = UDim2.new(1, -10, 1, -175)})
     else
-        Tween(SettingsFrame, {Size = UDim2.new(1, 0, 0, 435), Position = UDim2.new(0, 0, 1, -435)})
-        Tween(ScrollList, {Size = UDim2.new(1, -10, 1, -555)})
-        TogglesFrame.Visible = true
+        Tween(SettingsFrame, {Size = UDim2.new(1, 0, 0, 200), Position = UDim2.new(0, 0, 1, -200)})
+        Tween(ScrollList, {Size = UDim2.new(1, -10, 1, -315)})
     end
 end
 UpdateLayout()
@@ -1810,35 +1808,18 @@ end
 MinBtn.MouseButton1Click:Connect(function()
     local isMin = MainFrame.Size.Y.Offset < 100
     if not isMin then
-        -- Minimize: hide everything except header
         Tween(MainFrame, {Size = UDim2.new(0, 300, 0, 45)})
         ScrollList.Visible = false
-        StatusFrame.Visible = false
-        SearchFrame.Visible = false  -- Also hide search bar when minimized
         SettingsFrame.Visible = false
+        StatusFrame.Visible = false
         MinBtn.Text = "+"
     else
-        -- Restore: show everything
-        Tween(MainFrame, {Size = UDim2.new(0, 300, 0, 500)})
+        Tween(MainFrame, {Size = UDim2.new(0, 300, 0, 430)})
         task.wait(0.2)
         ScrollList.Visible = true
-        StatusFrame.Visible = true
-        SearchFrame.Visible = true   -- Show search bar again
         SettingsFrame.Visible = true
+        StatusFrame.Visible = true
         MinBtn.Text = "-"
-        
-        -- Restore the settings collapsed state properly
-        -- If settings were collapsed before minimize, keep them collapsed
-        -- If they were expanded, expand them again
-        if not settingsCollapsed then
-            Tween(SettingsFrame, {Size = UDim2.new(1, 0, 0, 435), Position = UDim2.new(0, 0, 1, -435)})
-            Tween(ScrollList, {Size = UDim2.new(1, -10, 1, -555)})
-            TogglesFrame.Visible = true
-        else
-            Tween(SettingsFrame, {Size = UDim2.new(1, 0, 0, 125), Position = UDim2.new(0, 0, 1, -125)})
-            Tween(ScrollList, {Size = UDim2.new(1, -10, 1, -245)})
-            TogglesFrame.Visible = false
-        end
     end
 end)
 
