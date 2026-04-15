@@ -1583,50 +1583,52 @@ UpdateList = function(detectedText, requiredLetter)
         local exacts = {}
         local partials = {}
         local maxPartialLen = 0
-
+        local MAX_RESULTS = 100  -- Set your limit here
+        
         local function checkWord(w)
             if Blacklist[w] or UsedWords[w] then return end
-
+            
             if not CheckSuffix(w) then return end
-
+            
             if not ignoreLengthFilter and lengthMode > 0 and #w ~= lengthMode then return end
-
+            
             local mLen = GetMatchLength(w, prefix)
             if mLen == #prefix then
                 table.insert(exacts, w)
+                return true  -- Signal that we added a word
             elseif #exacts == 0 then
                 if mLen > maxPartialLen then
                     maxPartialLen = mLen
                     partials = {w}
+                    return true
                 elseif mLen == maxPartialLen and mLen > 0 then
-                    if #partials < 50 then table.insert(partials, w) end
+                    if #partials < 50 then 
+                        table.insert(partials, w)
+                        return true
+                    end
                 end
             end
+            return false
         end
-
+        
         local useBinary = not (prefix:find("#") or prefix:find("%*"))
         if useBinary and #prefix > 0 then
             local startIndex = BinarySearchStart(bucket, prefix)
             if startIndex ~= -1 then
-                local count = 0
-                local hardLimit = (suffixMode ~= "" or lengthMode > 0) and 2000 or 800
-                local exactLimit = 500
                 for i = startIndex, #bucket do
                     local w = bucket[i]
                     if w:sub(1, #prefix) ~= prefix then break end
-                    checkWord(w)
-                    count = count + 1
-                    if #exacts >= exactLimit then break end
-                    if count >= hardLimit then break end
+                    local added = checkWord(w)
+                    if added and #exacts >= MAX_RESULTS then break end  -- Stop at 100
                 end
             end
         else
             for _, w in ipairs(bucket) do
-                checkWord(w)
-                if #exacts >= 1000 then break end
+                local added = checkWord(w)
+                if added and #exacts >= MAX_RESULTS then break end  -- Stop at 100
             end
         end
-
+        
         return exacts, partials, maxPartialLen
     end
 
@@ -1662,6 +1664,14 @@ UpdateList = function(detectedText, requiredLetter)
 
     if #exacts > 0 then
         matches = exacts
+        -- Trim to 100 if somehow more
+        if #matches > 100 then
+            local trimmed = {}
+            for i = 1, 100 do
+                table.insert(trimmed, matches[i])
+            end
+            matches = trimmed
+        end
     elseif pLen > 0 then
         matches = partials
         searchPrefix = searchPrefix:sub(1, pLen)
@@ -1676,7 +1686,7 @@ UpdateList = function(detectedText, requiredLetter)
                         local mLen = GetMatchLength(w, requiredLetter)
                         if mLen == #requiredLetter then
                             table.insert(matches, w)
-                            if #matches >= 100 then break end
+                            if #matches >= 100 then break end  -- Stop at 100
                         end
                     end
                 end
